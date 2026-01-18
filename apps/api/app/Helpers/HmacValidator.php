@@ -6,52 +6,52 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Helper de validation HMAC pour les requêtes BFF
+ * HMAC validation helper for BFF requests
  *
- * Valide les signatures HMAC des requêtes provenant du BFF Next.js
+ * Validates HMAC signatures of requests coming from Next.js BFF
  */
 class HmacValidator
 {
     /**
-     * Tolérance de timestamp en secondes (±5 minutes)
+     * Timestamp tolerance in seconds (±5 minutes)
      */
     private const TIMESTAMP_TOLERANCE = 300;
 
     /**
-     * Valide une requête HMAC
+     * Validates an HMAC request
      *
      * @param Request $request
      * @return array{valid: bool, error?: string}
      */
     public static function validate(Request $request): array
     {
-        // 1. Valider la présence des headers requis
+        // 1. Validate presence of required headers
         $headersValidation = self::validateHeaders($request);
         if (!$headersValidation['valid']) {
             return $headersValidation;
         }
 
-        // 2. Valider l'ID du BFF
+        // 2. Validate BFF ID
         $bffValidation = self::validateBffId($request);
         if (!$bffValidation['valid']) {
             return $bffValidation;
         }
 
-        // 3. Valider le timestamp
+        // 3. Validate timestamp
         $timestampValidation = self::validateTimestamp($request);
         if (!$timestampValidation['valid']) {
             return $timestampValidation;
         }
 
-        // 4. Générer le payload attendu
+        // 4. Generate expected payload
         $payload = self::generatePayload($request);
 
-        // 5. Valider la signature
+        // 5. Validate signature
         return self::validateSignature($request, $payload);
     }
 
     /**
-     * Valide la présence des headers requis
+     * Validates presence of required headers
      */
     private static function validateHeaders(Request $request): array
     {
@@ -75,7 +75,7 @@ class HmacValidator
     }
 
     /**
-     * Valide l'ID du BFF
+     * Validates BFF ID
      */
     private static function validateBffId(Request $request): array
     {
@@ -99,7 +99,7 @@ class HmacValidator
     }
 
     /**
-     * Valide le timestamp (anti-replay)
+     * Validates timestamp (anti-replay)
      */
     private static function validateTimestamp(Request $request): array
     {
@@ -125,7 +125,7 @@ class HmacValidator
     }
 
     /**
-     * Génère le payload pour la signature
+     * Generates payload for signature
      *
      * Format: TIMESTAMP:METHOD:PATH:BODY_HASH
      */
@@ -140,7 +140,7 @@ class HmacValidator
     }
 
     /**
-     * Calcule le hash du body
+     * Calculates body hash
      */
     private static function hashBody(Request $request): string
     {
@@ -150,7 +150,7 @@ class HmacValidator
             return '';
         }
 
-        // Normaliser le JSON: trier les clés par ordre alphabétique
+        // Normalize JSON: sort keys alphabetically
         $data = json_decode($body, true);
         if (is_array($data)) {
             $data = self::sortArrayKeys($data);
@@ -161,7 +161,7 @@ class HmacValidator
     }
 
     /**
-     * Trie récursivement les clés d'un tableau par ordre alphabétique
+     * Recursively sorts array keys alphabetically
      */
     private static function sortArrayKeys(array $array): array
     {
@@ -177,7 +177,7 @@ class HmacValidator
     }
 
     /**
-     * Valide la signature HMAC
+     * Validates HMAC signature
      */
     private static function validateSignature(Request $request, string $payload): array
     {
@@ -195,7 +195,7 @@ class HmacValidator
 
         $expectedSignature = hash_hmac('sha256', $payload, $secret);
 
-        // Comparaison sécurisée pour éviter les timing attacks
+        // Secure comparison to prevent timing attacks
         if (!hash_equals($expectedSignature, $providedSignature)) {
             Log::warning('BFF signature validation failed', [
                 'payload' => $payload,

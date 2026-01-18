@@ -1,8 +1,8 @@
 /**
- * Server Actions pour l'administration
+ * Server Actions for administration
  *
- * Ces actions utilisent le BFF pour communiquer avec Laravel.
- * Toutes ces routes nécessitent le rôle admin.
+ * These actions use the BFF to communicate with Laravel.
+ * All these routes require admin role.
  */
 
 'use server';
@@ -11,12 +11,12 @@ import { cookies } from 'next/headers';
 import type { User, Role, Permission } from '@rbac/types';
 
 /**
- * URL de base du BFF Next.js
+ * Base URL of Next.js BFF
  */
 const BFF_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
 /**
- * Types pour les réponses paginées
+ * Types for paginated responses
  */
 interface PaginatedResponse<T> {
   data: T[];
@@ -27,12 +27,12 @@ interface PaginatedResponse<T> {
 }
 
 /**
- * Effectue une requête au BFF
+ * Makes a request to the BFF
  *
- * Note: credentials: 'include' ne fonctionne PAS pour les requêtes server-to-server.
- * On doit passer le cookie manuellement dans les headers.
+ * Note: credentials: 'include' does NOT work for server-to-server requests.
+ * Must pass cookie manually in headers.
  *
- * @returns La réponse JSON directement (T)
+ * @returns JSON response directly (T)
  */
 async function bffRequest<T>(
   endpoint: string,
@@ -40,7 +40,7 @@ async function bffRequest<T>(
 ): Promise<T> {
   const url = `${BFF_URL}${endpoint}`;
 
-  // Récupérer le cookie pour les requêtes authentifiées
+  // Get cookie for authenticated requests
   const cookieStore = await cookies();
   const authToken = cookieStore.get('auth_token');
 
@@ -50,7 +50,7 @@ async function bffRequest<T>(
     ...options.headers,
   };
 
-  // Pour les requêtes server-to-server, passer le cookie manuellement
+  // For server-to-server requests, pass cookie manually
   if (authToken?.value) {
     (headers as Record<string, string>)['Cookie'] = `auth_token=${authToken.value}`;
   }
@@ -73,7 +73,7 @@ async function bffRequest<T>(
 // =========================================================================
 
 /**
- * Récupérer la liste des utilisateurs
+ * Get list of users
  */
 export async function getUsersAction(): Promise<(User & { roles: Role[] })[]> {
   const response = await bffRequest<{ data: (User & { roles: Role[] })[] }>(
@@ -83,7 +83,7 @@ export async function getUsersAction(): Promise<(User & { roles: Role[] })[]> {
 }
 
 /**
- * Récupérer un utilisateur par son ID
+ * Get a user by ID
  */
 export async function getUserAction(
   userId: number
@@ -95,7 +95,7 @@ export async function getUserAction(
 }
 
 /**
- * Assigner un rôle à un utilisateur
+ * Assign a role to a user
  */
 export async function assignRoleAction(
   userId: number,
@@ -112,7 +112,7 @@ export async function assignRoleAction(
 }
 
 /**
- * Retirer un rôle à un utilisateur
+ * Remove a role from a user
  */
 export async function removeRoleAction(
   userId: number,
@@ -130,7 +130,7 @@ export async function removeRoleAction(
 // =========================================================================
 
 /**
- * Récupérer la liste des rôles
+ * Get list of roles
  */
 export async function getRolesAction(): Promise<(Role & { permissions: Permission[] })[]> {
   const response = await bffRequest<{ data: (Role & { permissions: Permission[] })[] }>(
@@ -140,7 +140,7 @@ export async function getRolesAction(): Promise<(Role & { permissions: Permissio
 }
 
 /**
- * Créer un nouveau rôle
+ * Create a new role
  */
 export async function createRoleAction(data: {
   name: string;
@@ -155,7 +155,7 @@ export async function createRoleAction(data: {
 }
 
 /**
- * Mettre à jour les permissions d'un rôle
+ * Update role permissions
  */
 export async function updateRolePermissionsAction(
   roleId: number,
@@ -176,7 +176,7 @@ export async function updateRolePermissionsAction(
 // =========================================================================
 
 /**
- * Récupérer la liste des permissions
+ * Get list of permissions
  */
 export async function getPermissionsAction(): Promise<Permission[]> {
   const response = await bffRequest<{ data: Permission[] }>('/api/v1/admin/permissions');
@@ -184,7 +184,7 @@ export async function getPermissionsAction(): Promise<Permission[]> {
 }
 
 // =========================================================================
-// JSONPlaceholder - Fake Data pour tests métier RBAC
+// JSONPlaceholder - Fake Data for RBAC business logic tests
 // =========================================================================
 
 export interface Post {
@@ -224,7 +224,7 @@ export interface Todo {
 }
 
 /**
- * Récupérer tous les posts
+ * Get all posts
  */
 export async function getPostsAction(limit = 20): Promise<Post[]> {
   const response = await fetch(
@@ -234,7 +234,7 @@ export async function getPostsAction(limit = 20): Promise<Post[]> {
 }
 
 /**
- * Récupérer un post par ID
+ * Get a post by ID
  */
 export async function getPostAction(id: number): Promise<Post> {
   const response = await fetch(`https://jsonplaceholder.typicode.com/posts/${id}`);
@@ -242,7 +242,7 @@ export async function getPostAction(id: number): Promise<Post> {
 }
 
 /**
- * Récupérer les commentaires d'un post
+ * Get comments of a post
  */
 export async function getPostCommentsAction(postId: number): Promise<Comment[]> {
   const response = await fetch(
@@ -252,7 +252,7 @@ export async function getPostCommentsAction(postId: number): Promise<Comment[]> 
 }
 
 /**
- * Créer un post (simulation)
+ * Create a post (simulation)
  */
 export async function createPostAction(data: Omit<Post, 'id'>): Promise<Post> {
   const response = await fetch('https://jsonplaceholder.typicode.com/posts', {
@@ -264,7 +264,7 @@ export async function createPostAction(data: Omit<Post, 'id'>): Promise<Post> {
 }
 
 /**
- * Mettre à jour un post (simulation)
+ * Update a post (simulation)
  */
 export async function updatePostAction(id: number, data: Partial<Post>): Promise<Post> {
   const response = await fetch(`https://jsonplaceholder.typicode.com/posts/${id}`, {
@@ -276,7 +276,7 @@ export async function updatePostAction(id: number, data: Partial<Post>): Promise
 }
 
 /**
- * Supprimer un post (simulation)
+ * Delete a post (simulation)
  */
 export async function deletePostAction(id: number): Promise<void> {
   await fetch(`https://jsonplaceholder.typicode.com/posts/${id}`, {
@@ -285,7 +285,7 @@ export async function deletePostAction(id: number): Promise<void> {
 }
 
 /**
- * Récupérer les todos d'un utilisateur
+ * Get todos of a user
  */
 export async function getTodosAction(userId?: number): Promise<Todo[]> {
   const url = userId
@@ -296,7 +296,7 @@ export async function getTodosAction(userId?: number): Promise<Todo[]> {
 }
 
 /**
- * Récupérer les albums
+ * Get albums
  */
 export async function getAlbumsAction(limit = 10): Promise<Album[]> {
   const response = await fetch(
@@ -306,7 +306,7 @@ export async function getAlbumsAction(limit = 10): Promise<Album[]> {
 }
 
 /**
- * Récupérer les photos d'un album
+ * Get photos of an album
  */
 export async function getAlbumPhotosAction(albumId: number): Promise<Photo[]> {
   const response = await fetch(

@@ -1,8 +1,8 @@
 /**
- * Server Actions pour l'authentification
+ * Server Actions for authentication
  *
- * Ces actions utilisent le BFF pour communiquer avec Laravel.
- * L'authentification utilise maintenant des cookies HttpOnly.
+ * These actions use the BFF to communicate with Laravel.
+ * Authentication now uses HttpOnly cookies.
  */
 
 'use server';
@@ -11,12 +11,12 @@ import { cookies } from 'next/headers';
 import type { User, LoginCredentials, RegisterData, AuthTokens, ApiResponse } from '@rbac/types';
 
 /**
- * URL de base du BFF Next.js
+ * Base URL of Next.js BFF
  */
 const BFF_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
 /**
- * Erreur BFF personnalisée
+ * Custom BFF error
  */
 class BffRequestError extends Error {
   constructor(
@@ -30,7 +30,7 @@ class BffRequestError extends Error {
 }
 
 /**
- * Effectue une requête au BFF
+ * Makes a request to the BFF
  */
 async function bffRequest<T>(
   endpoint: string,
@@ -38,7 +38,7 @@ async function bffRequest<T>(
 ): Promise<ApiResponse<T>> {
   const url = `${BFF_URL}${endpoint}`;
 
-  // Récupérer le cookie pour les requêtes authentifiées
+  // Get cookie for authenticated requests
   const cookieStore = await cookies();
   const authToken = cookieStore.get('auth_token');
 
@@ -48,8 +48,8 @@ async function bffRequest<T>(
     ...options.headers,
   };
 
-  // Pour les requêtes server-to-server, on doit passer le cookie manuellement
-  // car credentials: 'include' ne fonctionne que côté navigateur
+  // For server-to-server requests, must pass cookie manually
+  // because credentials: 'include' only works on browser side
   if (authToken?.value) {
     (headers as Record<string, string>)['Cookie'] = `auth_token=${authToken.value}`;
   }
@@ -76,7 +76,7 @@ async function bffRequest<T>(
 
   const data = await response.json();
 
-  // Gérer les cookies de retour (nouveau token, etc.)
+  // Handle return cookies (new token, etc.)
   const setCookieHeaders = response.headers.getSetCookie();
   setCookieHeaders.forEach((cookieHeader) => {
     const [cookiePart] = cookieHeader.split(';');
@@ -89,7 +89,7 @@ async function bffRequest<T>(
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
         path: '/',
-        maxAge: 60 * 60 * 24 * 15, // 15 jours
+        maxAge: 60 * 60 * 24 * 15, // 15 days
       });
     }
   });
@@ -98,7 +98,7 @@ async function bffRequest<T>(
 }
 
 /**
- * Inscription d'un nouvel utilisateur
+ * Register a new user
  */
 export async function registerAction(
   data: RegisterData
@@ -110,7 +110,7 @@ export async function registerAction(
 }
 
 /**
- * Connexion d'un utilisateur
+ * Log in a user
  */
 export async function loginAction(
   credentials: LoginCredentials
@@ -122,7 +122,7 @@ export async function loginAction(
 }
 
 /**
- * Déconnexion
+ * Log out
  */
 export async function logoutAction(): Promise<void> {
   try {
@@ -130,14 +130,14 @@ export async function logoutAction(): Promise<void> {
       method: 'POST',
     });
   } finally {
-    // Supprimer le cookie côté client
+    // Delete cookie on client side
     const cookieStore = await cookies();
     cookieStore.delete('auth_token');
   }
 }
 
 /**
- * Rafraîchir le token
+ * Refresh token
  */
 export async function refreshTokenAction(): Promise<ApiResponse<AuthTokens>> {
   return bffRequest<AuthTokens>('/api/v1/auth/refresh', {
@@ -146,18 +146,18 @@ export async function refreshTokenAction(): Promise<ApiResponse<AuthTokens>> {
 }
 
 /**
- * Récupérer l'utilisateur actuel
+ * Get current user
  *
- * Note: Retourne null si l'utilisateur n'est pas connecté
- * (plutôt que de lancer une erreur)
+ * Note: Returns null if user is not logged in
+ * (rather than throwing an error)
  */
 export async function getCurrentUserAction(): Promise<User | null> {
   try {
     const response = await bffRequest<User>('/api/v1/me');
     return response.data;
   } catch (error) {
-    // Si l'utilisateur n'est pas connecté (401) ou si le BFF rejette (403),
-    // on retourne null silencieusement
+    // If user is not logged in (401) or BFF rejects (403),
+    // return null silently
     if (error instanceof BffRequestError) {
       if (error.statusCode === 401 || error.statusCode === 403) {
         return null;
@@ -168,14 +168,14 @@ export async function getCurrentUserAction(): Promise<User | null> {
 }
 
 /**
- * Récupérer la liste des providers OAuth
+ * Get list of OAuth providers
  */
 export async function getOAuthProvidersAction(): Promise<ApiResponse<string[]>> {
   return bffRequest<string[]>('/api/v1/auth/providers');
 }
 
 /**
- * Récupérer l'URL de redirection OAuth
+ * Get OAuth redirect URL
  */
 export async function getOAuthUrlAction(provider: string): Promise<{ url: string }> {
   const response = await bffRequest<{ redirect_url: string }>(

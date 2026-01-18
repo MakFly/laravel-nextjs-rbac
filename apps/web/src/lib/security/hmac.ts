@@ -1,26 +1,26 @@
 /**
- * Module de signature HMAC pour BFF
+ * HMAC signing module for BFF
  *
- * Ce module gère la génération de signatures HMAC pour sécuriser
- * les communications entre Next.js (BFF) et Laravel (API backend).
+ * This module handles HMAC signature generation to secure
+ * communications between Next.js (BFF) and Laravel (backend API).
  */
 
 import { createHash, createHmac } from 'crypto';
 import type { HmacHeaders } from './types';
 
 /**
- * Secret partagé HMAC (identique sur Laravel)
- * Doit être défini via la variable d'environnement BFF_HMAC_SECRET
+ * Shared HMAC secret (same on Laravel)
+ * Must be set via BFF_HMAC_SECRET environment variable
  */
 export const BFF_SECRET = process.env.BFF_HMAC_SECRET || '';
 
 /**
- * ID du BFF (doit correspondre à la config Laravel)
+ * BFF ID (must match Laravel config)
  */
 export const BFF_ID = process.env.BFF_ID || 'nextjs-bff-prod';
 
 /**
- * Vérifie que le secret HMAC est configuré
+ * Verifies that HMAC secret is configured
  */
 export function ensureHmacConfigured(): void {
   if (!BFF_SECRET) {
@@ -29,34 +29,34 @@ export function ensureHmacConfigured(): void {
 }
 
 /**
- * Calcule le hash SHA256 du body
- * Les clés JSON sont triées par ordre alphabétique pour assurer
- * la cohérence avec l'implémentation Laravel
+ * Calculates SHA256 hash of body
+ * JSON keys are sorted alphabetically to ensure
+ * consistency with Laravel implementation
  */
 export function hashBody(body: unknown): string {
   if (!body) {
     return '';
   }
 
-  // Normaliser et trier les clés JSON
+  // Normalize and sort JSON keys
   const normalized = sortObjectKeys(body);
   const jsonString = JSON.stringify(normalized, (key, value) => {
-    // Normaliser les formats pour la cohérence
+    // Normalize formats for consistency
     if (typeof value === 'number' && Number.isInteger(value)) {
       return value;
     }
     return value;
   }, 0);
 
-  // Retirer les espaces pour la cohérence
+  // Remove spaces for consistency
   const compactJson = jsonString.replace(/\s/g, '');
 
   return createHash('sha256').update(compactJson, 'utf8').digest('hex');
 }
 
 /**
- * Trie récursivement les clés d'un objet par ordre alphabétique
- * pour assurer la cohérence de la signature avec Laravel
+ * Recursively sorts object keys alphabetically
+ * to ensure signature consistency with Laravel
  */
 function sortObjectKeys(obj: unknown): unknown {
   if (obj === null || typeof obj !== 'object') {
@@ -78,12 +78,12 @@ function sortObjectKeys(obj: unknown): unknown {
 }
 
 /**
- * Génère les headers HMAC pour une requête
+ * Generates HMAC headers for a request
  *
- * @param method - Méthode HTTP (GET, POST, etc.)
- * @param path - Chemin de la requête (ex: /api/v1/auth/login)
- * @param body - Corps de la requête (optionnel)
- * @returns Headers HMAC requis + body normalisé à envoyer
+ * @param method - HTTP method (GET, POST, etc.)
+ * @param path - Request path (ex: /api/v1/auth/login)
+ * @param body - Request body (optional)
+ * @returns Required HMAC headers + normalized body to send
  */
 export function generateSignature(
   method: string,
@@ -92,14 +92,14 @@ export function generateSignature(
 ): HmacHeaders & { normalizedBody?: string } {
   ensureHmacConfigured();
 
-  // Timestamp en SECONDES (pas millisecondes) pour compatibilité Laravel
+  // Timestamp in SECONDS (not milliseconds) for Laravel compatibility
   const timestamp = Math.floor(Date.now() / 1000).toString();
   const bodyHash = hashBody(body);
 
-  // Format du payload: TIMESTAMP:METHOD:PATH:BODY_HASH
+  // Payload format: TIMESTAMP:METHOD:PATH:BODY_HASH
   const payload = `${timestamp}:${method}:${path}:${bodyHash}`;
 
-  // Générer la signature HMAC-SHA256
+  // Generate HMAC-SHA256 signature
   const signature = createHmac('sha256', BFF_SECRET)
     .update(payload, 'utf8')
     .digest('hex');
@@ -110,7 +110,7 @@ export function generateSignature(
     'X-BFF-Signature': signature,
   };
 
-  // Retourner aussi le body normalisé (trié) pour l'envoyer
+  // Also return normalized (sorted) body to send
   let normalizedBody: string | undefined;
   if (body !== null && body !== undefined) {
     const normalized = sortObjectKeys(body);
@@ -121,22 +121,22 @@ export function generateSignature(
 }
 
 /**
- * Reconstruit le chemin Laravel depuis le chemin BFF
+ * Rebuilds Laravel path from BFF path
  *
- * Note: Les routes Laravel sont maintenant sous /api/v1/* avec le middleware HMAC.
- * Les seules routes sans HMAC sont les callbacks OAuth sous /api/auth/*.
+ * Note: Laravel routes are now under /api/v1/* with HMAC middleware.
+ * Only OAuth callbacks under /api/auth/* don't require HMAC.
  *
- * Cette fonction retourne le chemin tel quel car les routes BFF correspondent
- * exactement aux routes Laravel.
+ * This function returns the path as-is because BFF routes correspond
+ * exactly to Laravel routes.
  */
 export function buildLaravelPath(bffPath: string): string {
-  // Les routes /api/v1/* dans Next.js correspondent aux routes /api/v1/* dans Laravel
+  // /api/v1/* routes in Next.js correspond to /api/v1/* routes in Laravel
   return bffPath;
 }
 
 /**
- * Extrait le chemin et la méthode depuis une URL Next.js
- * Pour une utilisation avec Next.js Request object
+ * Extracts path and method from a Next.js URL
+ * For use with Next.js Request object
  */
 export function extractPathFromUrl(url: string): string {
   try {

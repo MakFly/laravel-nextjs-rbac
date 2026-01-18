@@ -1,9 +1,9 @@
 /**
- * Types pour la sécurité BFF et HMAC
+ * Types for BFF security and HMAC
  */
 
 /**
- * Headers HMAC requis pour communiquer avec Laravel
+ * Required HMAC headers for communication with Laravel
  */
 export interface HmacHeaders {
   'X-BFF-Id': string;
@@ -12,7 +12,7 @@ export interface HmacHeaders {
 }
 
 /**
- * Erreur BFF standardisée
+ * Standardized BFF error
  */
 export interface BffError {
   code: BffErrorCode;
@@ -21,7 +21,7 @@ export interface BffError {
 }
 
 /**
- * Codes d'erreur BFF
+ * BFF error codes
  */
 export enum BffErrorCode {
   INVALID_SIGNATURE = 'INVALID_SIGNATURE',
@@ -34,7 +34,7 @@ export enum BffErrorCode {
 }
 
 /**
- * Exception BFF pour les erreurs contrôlées
+ * BFF exception for controlled errors
  */
 export class BffException extends Error {
   constructor(
@@ -56,7 +56,7 @@ export class BffException extends Error {
 }
 
 /**
- * Configuration BFF
+ * BFF configuration
  */
 export interface BffConfig {
   id: string;
@@ -66,7 +66,7 @@ export interface BffConfig {
 }
 
 /**
- * Résultat d'une requête BFF
+ * BFF request result
  */
 export interface BffResponse<T = unknown> {
   data: T;
@@ -75,7 +75,7 @@ export interface BffResponse<T = unknown> {
 }
 
 /**
- * Options de requête BFF
+ * BFF request options
  */
 export interface BffRequestOptions {
   method: string;

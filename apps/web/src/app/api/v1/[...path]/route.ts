@@ -1,8 +1,8 @@
 /**
  * BFF Route Handler
  *
- * Ce handler catch-all proxy toutes les requêtes /api/v1/* vers Laravel
- * en ajoutant automatiquement la signature HMAC.
+ * This catch-all handler proxies all /api/v1/* requests to Laravel
+ * while automatically adding HMAC signature.
  */
 
 import { type NextRequest, NextResponse } from 'next/server';
@@ -11,45 +11,45 @@ import { BffException, BffErrorCode, type HmacHeaders } from '@/lib/security/typ
 import { cookies } from 'next/headers';
 
 /**
- * Configuration Laravel
+ * Laravel configuration
  */
 const LARAVEL_API_URL = process.env.LARAVEL_API_URL || 'http://localhost:8000';
-const BFF_TIMEOUT = 30000; // 30 secondes
+const BFF_TIMEOUT = 30000; // 30 seconds
 
 /**
- * Type pour les params de route dynamique Next.js 14+
+ * Type for Next.js 14+ dynamic route params
  */
 interface RouteParams {
   params: Promise<{ path: string[] }>;
 }
 
 /**
- * Regex pour valider les segments de path (alphanumériques, tirets, underscores uniquement)
+ * Regex to validate path segments (alphanumerics, dashes, underscores only)
  */
 const SAFE_PATH_SEGMENT = /^[a-zA-Z0-9_-]+$/;
 
 /**
- * Valide les segments de path pour prévenir les attaques SSRF/Path Traversal
- * @throws {BffException} si le path contient des segments dangereux
+ * Validates path segments to prevent SSRF/Path Traversal attacks
+ * @throws {BffException} if path contains dangerous segments
  */
 function validatePathSegments(segments: string[]): void {
   for (const segment of segments) {
-    // Rejeter les segments vides
+    // Reject empty segments
     if (!segment) {
       throw new BffException(BffErrorCode.INVALID_SIGNATURE, 'Invalid path: empty segment');
     }
 
-    // Rejeter path traversal
+    // Reject path traversal
     if (segment === '..' || segment === '.') {
       throw new BffException(BffErrorCode.INVALID_SIGNATURE, 'Invalid path: traversal not allowed');
     }
 
-    // Rejeter les URLs absolues
+    // Reject absolute URLs
     if (segment.includes('://') || segment.startsWith('//')) {
       throw new BffException(BffErrorCode.INVALID_SIGNATURE, 'Invalid path: absolute URLs not allowed');
     }
 
-    // Valider le format du segment (alphanumériques, tirets, underscores)
+    // Validate segment format (alphanumerics, dashes, underscores)
     if (!SAFE_PATH_SEGMENT.test(segment)) {
       throw new BffException(BffErrorCode.INVALID_SIGNATURE, 'Invalid path: forbidden characters');
     }
@@ -57,7 +57,7 @@ function validatePathSegments(segments: string[]): void {
 }
 
 /**
- * Fonction principale de proxy vers Laravel
+ * Main proxy function to Laravel
  */
 async function proxyRequest(
   request: NextRequest,
@@ -65,26 +65,26 @@ async function proxyRequest(
   paramsPromise: RouteParams['params']
 ): Promise<NextResponse> {
   try {
-    // Extraire le chemin depuis les params
+    // Extract path from params
     const params = await paramsPromise;
     const pathSegments = params.path;
 
-    // Valider les segments pour prévenir SSRF
+    // Validate segments to prevent SSRF
     validatePathSegments(pathSegments);
 
     const bffPath = `/api/v1/${pathSegments.join('/')}`;
 
-    // Reconstruire le chemin Laravel (SANS le slash au début pour correspondre à Laravel)
+    // Rebuild Laravel path (WITHOUT leading slash to match Laravel)
     const laravelPath = buildLaravelPath(bffPath).replace(/^\//, '');
     const laravelUrl = new URL(laravelPath, LARAVEL_API_URL);
 
-    // Double vérification: s'assurer que l'URL finale pointe vers Laravel
+    // Double check: ensure final URL points to Laravel
     const expectedHost = new URL(LARAVEL_API_URL).host;
     if (laravelUrl.host !== expectedHost) {
       throw new BffException(BffErrorCode.INVALID_SIGNATURE, 'Invalid request: host mismatch');
     }
 
-    // Récupérer le body pour la signature
+    // Get body for signature
     const clonedRequest = request.clone();
     let body: unknown = null;
 
@@ -95,11 +95,11 @@ async function proxyRequest(
           body = await clonedRequest.json();
         }
       } catch {
-        // Pas de body ou non-JSON
+        // No body or non-JSON
       }
     }
 
-    // Générer la signature HMAC avec le body parsé
+    // Generate HMAC signature with parsed body
     const hmacResult = generateSignature(method, laravelPath, body);
     const hmacHeaders: HmacHeaders = {
       'X-BFF-Id': hmacResult['X-BFF-Id'],
@@ -109,14 +109,14 @@ async function proxyRequest(
 
     const cookieStore = await cookies();
 
-    // Préparer les headers pour Laravel
+    // Prepare headers for Laravel
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
       ...hmacHeaders,
     };
 
-    // Routes publiques qui ne nécessitent pas d'authentification
+    // Public routes that don't require authentication
     const publicRoutes = [
       'api/v1/auth/login',
       'api/v1/auth/register',
@@ -124,7 +124,7 @@ async function proxyRequest(
     ];
     const isPublicRoute = publicRoutes.some((route) => laravelPath.startsWith(route));
 
-    // Transférer le token d'authentification si présent (Bearer token pour Laravel)
+    // Transfer auth token if present (Bearer token for Laravel)
     const authToken = cookieStore.get('auth_token')?.value;
 
     if (authToken) {
@@ -136,68 +136,68 @@ async function proxyRequest(
       );
     }
 
-    // Créer l'AbortController pour le timeout
+    // Create AbortController for timeout
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), BFF_TIMEOUT);
 
     try {
-      // Préparer les options de fetch
+      // Prepare fetch options
       const options: RequestInit = {
         method,
         headers,
         signal: controller.signal,
       };
 
-      // Envoyer le body normalisé (trié) pour correspondre à la signature
+      // Send normalized (sorted) body to match signature
       if (hmacResult.normalizedBody !== undefined) {
         options.body = hmacResult.normalizedBody;
       }
 
-      // Copier les query params
+      // Copy query params
       request.nextUrl.searchParams.forEach((value, key) => {
         laravelUrl.searchParams.set(key, value);
       });
 
-      // Effectuer la requête vers Laravel
+      // Make request to Laravel
       const response = await fetch(laravelUrl.toString(), options);
 
       clearTimeout(timeoutId);
 
-      // Récupérer les cookies de la réponse (nouveau token, etc.)
+      // Get response cookies (new token, etc.)
       const setCookieHeaders = response.headers.getSetCookie();
       const responseHeaders = new Headers();
 
-      // Copier les headers de réponse importants
+      // Copy important response headers
       response.headers.forEach((value, key) => {
         if (key !== 'set-cookie') {
           responseHeaders.set(key, value);
         }
       });
 
-      // Transférer les cookies depuis Laravel
+      // Transfer cookies from Laravel
       setCookieHeaders.forEach((cookie) => {
         responseHeaders.append('set-cookie', cookie);
       });
 
-      // Récupérer le body de la réponse
+      // Get response body
       const responseData = await response.text();
 
-      // Créer la réponse Next.js
+      // Create Next.js response
       const nextResponse = new NextResponse(responseData, {
         status: response.status,
         statusText: response.statusText,
         headers: responseHeaders,
       });
 
-      // Si Laravel retourne un access_token, définir un cookie HttpOnly
+      // If Laravel returns access_token, set HttpOnly cookie
       try {
         const jsonData = JSON.parse(responseData);
         if (jsonData.data?.access_token) {
           const token = jsonData.data.access_token;
           const expiresAt = new Date();
-          expiresAt.setDate(expiresAt.getDate() + 15); // 15 jours
+          expiresAt.setDate(expiresAt.getDate() + 15); // 15 days
 
-          // Définir le cookie HttpOnly
+          // Set HttpOnly cookie
           nextResponse.cookies.set('auth_token', token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
@@ -207,7 +207,7 @@ async function proxyRequest(
           });
         }
       } catch {
-        // Pas de JSON ou pas de token
+        // No JSON or no token
       }
 
       return nextResponse;
@@ -221,7 +221,7 @@ async function proxyRequest(
       throw error;
     }
   } catch (error) {
-    // Gestion des erreurs
+    // Error handling
     if (error instanceof BffException) {
       return NextResponse.json(
         { error: error.message, code: error.code },
@@ -237,7 +237,7 @@ async function proxyRequest(
 }
 
 /**
- * Handlers pour chaque méthode HTTP
+ * Handlers for each HTTP method
  */
 export async function GET(request: NextRequest, params: RouteParams) {
   return proxyRequest(request, 'GET', params.params);
@@ -260,7 +260,7 @@ export async function DELETE(request: NextRequest, params: RouteParams) {
 }
 
 /**
- * Configurer les options de route
+ * Configure route options
  */
-export const runtime = 'nodejs'; // Nécessaire pour crypto
-export const dynamic = 'force-dynamic'; // Désactiver le cache pour les routes sensibles
+export const runtime = 'nodejs'; // Required for crypto
+export const dynamic = 'force-dynamic'; // Disable cache for sensitive routes
