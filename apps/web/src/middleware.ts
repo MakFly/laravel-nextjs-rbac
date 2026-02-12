@@ -8,12 +8,12 @@ const protectedRoutes = ["/dashboard"];
 const authRoutes = ["/auth/login", "/auth/register"];
 
 export function middleware(request: NextRequest) {
-  const token = request.cookies.get("auth_token")?.value;
+  const session = request.cookies.get("laravel_session")?.value;
   const { pathname } = request.nextUrl;
 
-  // Check if trying to access protected route without token
+  // Check if trying to access protected route without session
   if (protectedRoutes.some((route) => pathname.startsWith(route))) {
-    if (!token) {
+    if (!session) {
       const loginUrl = new URL("/auth/login", request.url);
       loginUrl.searchParams.set("redirect", pathname);
       return NextResponse.redirect(loginUrl);
@@ -22,7 +22,7 @@ export function middleware(request: NextRequest) {
 
   // Check if trying to access auth routes while authenticated
   if (authRoutes.some((route) => pathname.startsWith(route))) {
-    if (token) {
+    if (session) {
       return NextResponse.redirect(new URL("/", request.url));
     }
   }

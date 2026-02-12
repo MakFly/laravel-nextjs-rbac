@@ -9,22 +9,20 @@ interface DashboardLayoutProps {
 }
 
 /**
- * Layout SSR pour le dashboard
+ * SSR layout for the dashboard
  *
- * - Vérifie l'authentification côté serveur (cookie check)
- * - Redirige vers /auth/login si non connecté
- * - Fetch le user côté serveur et le passe à AppSidebar pour éviter le flash
+ * - Server-side auth check (session cookie)
+ * - Redirects to /auth/login if not logged in
+ * - Fetches user server-side for initial sidebar render
  */
 export default async function DashboardLayout({ children }: DashboardLayoutProps) {
-  // Vérifier le cookie d'auth
   const cookieStore = await cookies();
-  const authToken = cookieStore.get('auth_token');
+  const session = cookieStore.get('laravel_session');
 
-  if (!authToken?.value) {
+  if (!session?.value) {
     redirect('/auth/login');
   }
 
-  // Fetch le user côté serveur pour le render initial de la sidebar
   const initialUser = await getCurrentUserAction();
 
   return (

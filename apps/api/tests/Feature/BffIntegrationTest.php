@@ -130,13 +130,12 @@ class BffIntegrationTest extends TestCase
 
     public function test_v1_admin_roles_with_admin_user(): void
     {
-        $adminRole = \App\Models\Role::firstOrCreate(
-            ['slug' => 'admin'],
-            ['name' => 'Administrator', 'description' => 'Admin user']
+        $adminRole = \Spatie\Permission\Models\Role::firstOrCreate(
+            ['name' => 'admin', 'guard_name' => 'api']
         );
 
         $user = User::factory()->create();
-        $user->roles()->attach($adminRole);
+        $user->assignRole($adminRole);
         $token = $user->createToken('test-token')->accessToken;
 
         $headers = $this->withBffHeaders('GET', '/api/v1/admin/roles');
@@ -147,20 +146,19 @@ class BffIntegrationTest extends TestCase
         $response->assertStatus(200);
         $response->assertJsonStructure([
             'data' => [
-                '*' => ['id', 'name', 'slug', 'description', 'permissions']
+                '*' => ['id', 'name', 'slug', 'permissions']
             ]
         ]);
     }
 
     public function test_v1_admin_users_with_admin_user(): void
     {
-        $adminRole = \App\Models\Role::firstOrCreate(
-            ['slug' => 'admin'],
-            ['name' => 'Administrator', 'description' => 'Admin user']
+        $adminRole = \Spatie\Permission\Models\Role::firstOrCreate(
+            ['name' => 'admin', 'guard_name' => 'api']
         );
 
         $user = User::factory()->create();
-        $user->roles()->attach($adminRole);
+        $user->assignRole($adminRole);
         $token = $user->createToken('test-token')->accessToken;
 
         $headers = $this->withBffHeaders('GET', '/api/v1/admin/users');
@@ -217,21 +215,19 @@ class BffIntegrationTest extends TestCase
     public function test_permission_based_route_with_hmac(): void
     {
         // Créer une permission
-        $permission = \App\Models\Permission::firstOrCreate(
-            ['resource' => 'posts', 'action' => 'read'],
-            ['description' => 'Read posts']
+        $permission = \Spatie\Permission\Models\Permission::firstOrCreate(
+            ['name' => 'posts.read', 'guard_name' => 'api']
         );
 
         // Créer un rôle avec la permission
-        $role = \App\Models\Role::firstOrCreate(
-            ['slug' => 'editor'],
-            ['name' => 'Editor', 'description' => 'Can edit posts']
+        $role = \Spatie\Permission\Models\Role::firstOrCreate(
+            ['name' => 'editor', 'guard_name' => 'api']
         );
-        $role->permissions()->attach($permission);
+        $role->givePermissionTo($permission);
 
         // Créer un utilisateur avec le rôle
         $user = User::factory()->create();
-        $user->roles()->attach($role);
+        $user->assignRole($role);
         $token = $user->createToken('test-token')->accessToken;
 
         $headers = $this->withBffHeaders('GET', '/api/v1/posts');

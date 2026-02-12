@@ -2,31 +2,34 @@
 
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\OAuthController;
+use App\Http\Controllers\UserController;
+use App\Http\Controllers\Admin\UserController as AdminUserController;
+use App\Http\Controllers\Admin\RoleController;
+use App\Http\Controllers\Admin\PermissionController;
+use App\Http\Controllers\Admin\ImpersonationController;
 use Illuminate\Support\Facades\Route;
 
 // =========================================================================
-// Public OAuth Routes (sans HMAC, sans v1) - Pour OAuth providers
-// Ces routes DOIVENT rester accessibles directement depuis l'extérieur
+// Public OAuth Routes (no HMAC, no prefix) - For OAuth providers
+// These routes MUST remain directly accessible from outside
 // =========================================================================
 
-Route::prefix('auth')->group(function () {
-    // OAuth Routes (redirections depuis providers externes)
+// 'web' middleware ensures session is available for SPA OAuth callback (Auth::login)
+Route::middleware('web')->prefix('auth')->group(function () {
     Route::get('/{provider}/redirect', [OAuthController::class, 'redirect']);
     Route::get('/{provider}/callback', [OAuthController::class, 'callback']);
 });
 
 // =========================================================================
-// Route de debug (SANS HMAC) pour tester
+// Debug route (no HMAC) for testing
 // =========================================================================
 
 Route::get('/v1/debug/hmac', function (\Illuminate\Http\Request $request) {
-    // Recréer le calcul de signature Laravel
     $timestamp = $request->header('X-BFF-Timestamp');
     $method = $request->method();
     $path = $request->path();
     $body = $request->getContent();
 
-    // Calculer le body hash comme Laravel le fait
     $bodyHash = $body ? hash('sha256', $body) : '';
     $payload = "{$timestamp}:{$method}:{$path}:{$bodyHash}";
     $expectedSignature = hash_hmac('sha256', $payload, config('services.bff.secret'));
@@ -54,107 +57,47 @@ Route::get('/v1/debug/hmac', function (\Illuminate\Http\Request $request) {
 });
 
 // =========================================================================
-// Versioned API Routes (AVEC HMAC) - Accès via BFF uniquement
-// Toutes les routes /api/v1/* nécessitent la signature HMAC
+// BFF Routes (Passport + HMAC) - Access via BFF only
+// All /api/v1/* routes require HMAC signature
 // =========================================================================
 
 Route::prefix('v1')
     ->middleware('bff.hmac')
     ->group(function () {
 
-        // -------------------------------------------------------------------
-        // Routes d'auth publiques (sans auth:api, mais avec HMAC)
-        // Le BFF Next.js peut appeler ces routes avec HMAC
-        // -------------------------------------------------------------------
+        // Public auth routes (no auth:api, but with HMAC)
         Route::prefix('auth')->group(function () {
             Route::post('/register', [AuthController::class, 'register']);
             Route::post('/login', [AuthController::class, 'login']);
             Route::get('/providers', [OAuthController::class, 'providers']);
         });
 
-        // -------------------------------------------------------------------
-        // Routes protégées (nécessitent auth:api + HMAC)
-        // -------------------------------------------------------------------
+        // Protected routes (auth:api + HMAC)
         Route::middleware('auth:api')->group(function () {
 
-            // Auth routes
             Route::prefix('auth')->group(function () {
                 Route::post('/logout', [AuthController::class, 'logout']);
                 Route::post('/refresh', [AuthController::class, 'refresh']);
             });
 
-            // Current User
             Route::get('/me', [AuthController::class, 'me']);
+            Route::get('/users', [UserController::class, 'index']);
 
-            // Users list (accessible par tous les users authentifiés)
-            Route::get('/users', function () {
-                return response()->json([
-                    'data' => \App\Models\User::with('roles')->get(),
-                ]);
-            });
-
-            // -------------------------------------------------------------------
-            // Admin Routes (role: admin)
-            // -------------------------------------------------------------------
+            // Admin routes
             Route::middleware('role:admin')->prefix('admin')->group(function () {
-                // Users Management
-                Route::get('/users', function () {
-                    return response()->json([
-                        'data' => \App\Models\User::with('roles')->paginate(15),
-                    ]);
-                });
+                Route::get('/users', [AdminUserController::class, 'index']);
+                Route::get('/users/{user}', [AdminUserController::class, 'show']);
+                Route::post('/users/{user}/roles', [AdminUserController::class, 'assignRole']);
+                Route::delete('/users/{user}/roles/{role}', [AdminUserController::class, 'removeRole']);
 
-                Route::get('/users/{user}', function (\App\Models\User $user) {
-                    return response()->json([
-                        'data' => $user->load('roles.permissions'),
-                    ]);
-                });
+                Route::get('/roles', [RoleController::class, 'index']);
+                Route::post('/roles', [RoleController::class, 'store']);
+                Route::post('/roles/{role}/permissions', [RoleController::class, 'updatePermissions']);
 
-                Route::post('/users/{user}/roles', function (\App\Models\User $user, \Illuminate\Http\Request $request) {
-                    $validated = $request->validate(['role' => 'required|string|exists:roles,slug']);
-                    $user->assignRole($validated['role']);
-                    return response()->json(['message' => 'Role assigned', 'data' => $user->load('roles')]);
-                });
-
-                Route::delete('/users/{user}/roles/{role}', function (\App\Models\User $user, \App\Models\Role $role) {
-                    $user->removeRole($role);
-                    return response()->json(['message' => 'Role removed']);
-                });
-
-                // Roles Management
-                Route::get('/roles', function () {
-                    return response()->json([
-                        'data' => \App\Models\Role::with('permissions')->get(),
-                    ]);
-                });
-
-                Route::post('/roles', function (\Illuminate\Http\Request $request) {
-                    $validated = $request->validate([
-                        'name' => 'required|string|max:255',
-                        'slug' => 'required|string|max:255|unique:roles',
-                        'description' => 'nullable|string',
-                    ]);
-                    $role = \App\Models\Role::create($validated);
-                    return response()->json(['data' => $role], 201);
-                });
-
-                // Permissions Management
-                Route::get('/permissions', function () {
-                    return response()->json([
-                        'data' => \App\Models\Permission::all(),
-                    ]);
-                });
-
-                Route::post('/roles/{role}/permissions', function (\App\Models\Role $role, \Illuminate\Http\Request $request) {
-                    $validated = $request->validate(['permissions' => 'required|array']);
-                    $role->permissions()->sync($validated['permissions']);
-                    return response()->json(['message' => 'Permissions updated', 'data' => $role->load('permissions')]);
-                });
+                Route::get('/permissions', [PermissionController::class, 'index']);
             });
 
-            // -------------------------------------------------------------------
-            // Permission-based Routes Examples
-            // -------------------------------------------------------------------
+            // Permission-based route examples
             Route::middleware('permission:posts.read')->get('/posts', function () {
                 return response()->json(['message' => 'Posts list - you have posts.read permission']);
             });
@@ -164,3 +107,55 @@ Route::prefix('v1')
             });
         });
     });
+
+// =========================================================================
+// SPA Routes (Sanctum session-based) - Access via Vue.js SPA
+// All /api/spa/* routes use session auth via web guard
+// =========================================================================
+
+Route::prefix('spa')->group(function () {
+
+    // Public auth routes
+    Route::prefix('auth')->group(function () {
+        Route::post('/login', [AuthController::class, 'spaLogin']);
+        Route::post('/register', [AuthController::class, 'spaRegister']);
+        Route::get('/providers', [OAuthController::class, 'providers']);
+    });
+
+    // Protected routes (session auth via web guard)
+    Route::middleware('auth:web')->group(function () {
+
+        Route::post('/auth/logout', [AuthController::class, 'spaLogout']);
+        Route::get('/me', [AuthController::class, 'me']);
+        Route::get('/users', [UserController::class, 'index']);
+
+        // Admin routes
+        Route::middleware('role:admin')->prefix('admin')->group(function () {
+            Route::get('/users', [AdminUserController::class, 'index']);
+            Route::get('/users/{user}', [AdminUserController::class, 'show']);
+            Route::post('/users/{user}/roles', [AdminUserController::class, 'assignRole']);
+            Route::delete('/users/{user}/roles/{role}', [AdminUserController::class, 'removeRole']);
+
+            Route::get('/roles', [RoleController::class, 'index']);
+            Route::post('/roles', [RoleController::class, 'store']);
+            Route::post('/roles/{role}/permissions', [RoleController::class, 'updatePermissions']);
+
+            Route::get('/permissions', [PermissionController::class, 'index']);
+
+            // Impersonation (start) - requires admin role
+            Route::post('/impersonate/{user}', [ImpersonationController::class, 'impersonate']);
+        });
+
+        // Stop impersonation - OUTSIDE admin group (impersonated user is not admin)
+        Route::post('/admin/stop-impersonate', [ImpersonationController::class, 'stopImpersonating']);
+
+        // Permission-based route examples
+        Route::middleware('permission:posts.read')->get('/posts', function () {
+            return response()->json(['message' => 'Posts list - you have posts.read permission']);
+        });
+
+        Route::middleware('permission:posts.create')->post('/posts', function () {
+            return response()->json(['message' => 'Create post - you have posts.create permission']);
+        });
+    });
+});

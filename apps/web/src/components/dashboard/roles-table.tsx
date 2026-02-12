@@ -29,7 +29,6 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import {
   Checkbox,
 } from '@/components/ui/checkbox';
@@ -71,14 +70,12 @@ export function RolesTable({ roles, permissions }: RolesTableProps) {
   const [selectedRole, setSelectedRole] = useState<(Role & { permissions: Permission[] }) | null>(null);
   const [formData, setFormData] = useState({
     name: '',
-    slug: '',
-    description: '',
   });
   const [selectedPermissions, setSelectedPermissions] = useState<number[]>([]);
 
   const openCreateDialog = () => {
     setDialogMode('create');
-    setFormData({ name: '', slug: '', description: '' });
+    setFormData({ name: '' });
     setSelectedPermissions([]);
     setDialogOpen(true);
   };
@@ -91,7 +88,7 @@ export function RolesTable({ roles, permissions }: RolesTableProps) {
   };
 
   const handleCreate = () => {
-    if (!formData.name.trim() || !formData.slug.trim()) return;
+    if (!formData.name.trim()) return;
 
     startTransition(async () => {
       try {
@@ -219,25 +216,6 @@ export function RolesTable({ roles, permissions }: RolesTableProps) {
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="e.g., Editor"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="slug">Slug</Label>
-                <Input
-                  id="slug"
-                  value={formData.slug}
-                  onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
-                  placeholder="e.g., editor"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Role description..."
-                  rows={3}
                 />
               </div>
             </div>

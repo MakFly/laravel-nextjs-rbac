@@ -33,7 +33,7 @@ class AuthController extends Controller
 
         return response()->json([
             'data' => [
-                'user' => $this->formatUser($user),
+                'user' => self::formatUser($user),
                 'access_token' => $token,
                 'token_type' => 'Bearer',
             ],
@@ -59,7 +59,7 @@ class AuthController extends Controller
 
         return response()->json([
             'data' => [
-                'user' => $this->formatUser($user),
+                'user' => self::formatUser($user),
                 'access_token' => $token,
                 'token_type' => 'Bearer',
             ],
@@ -78,10 +78,92 @@ class AuthController extends Controller
 
     public function me(Request $request): JsonResponse
     {
+        $userData = self::formatUser($request->user());
+
+        // Add impersonation state when session is available (SPA routes)
+        if ($request->hasSession() && $request->session()->has('impersonator_id')) {
+            $impersonator = User::find($request->session()->get('impersonator_id'));
+            $userData['is_impersonating'] = true;
+            $userData['impersonator'] = $impersonator ? [
+                'id' => $impersonator->id,
+                'name' => $impersonator->name,
+                'email' => $impersonator->email,
+            ] : null;
+        }
+
         return response()->json([
-            'data' => $this->formatUser($request->user()),
+            'data' => $userData,
         ]);
     }
+
+    // =========================================================================
+    // SPA Auth (Sanctum session-based)
+    // =========================================================================
+
+    public function spaLogin(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'email' => 'required|email',
+            'password' => 'required',
+        ]);
+
+        if (!Auth::attempt($validated)) {
+            throw ValidationException::withMessages([
+                'email' => ['The provided credentials are incorrect.'],
+            ]);
+        }
+
+        $request->session()->regenerate();
+
+        return response()->json([
+            'data' => [
+                'user' => self::formatUser(Auth::user()),
+            ],
+            'message' => 'Login successful',
+        ]);
+    }
+
+    public function spaRegister(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|string|email|max:255|unique:users',
+            'password' => 'required|string|min:8|confirmed',
+        ]);
+
+        $user = User::create([
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'password' => Hash::make($validated['password']),
+        ]);
+
+        $user->assignRole('user');
+
+        Auth::login($user);
+        $request->session()->regenerate();
+
+        return response()->json([
+            'data' => [
+                'user' => self::formatUser($user),
+            ],
+            'message' => 'User registered successfully',
+        ], 201);
+    }
+
+    public function spaLogout(Request $request): JsonResponse
+    {
+        Auth::guard('web')->logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
+        return response()->json([
+            'message' => 'Successfully logged out',
+        ]);
+    }
+
+    // =========================================================================
+    // BFF Auth (Passport token-based)
+    // =========================================================================
 
     public function refresh(Request $request): JsonResponse
     {
@@ -98,7 +180,7 @@ class AuthController extends Controller
         ]);
     }
 
-    private function formatUser(User $user): array
+    public static function formatUser(User $user): array
     {
         $user->load('roles.permissions');
 
@@ -112,15 +194,18 @@ class AuthController extends Controller
             'roles' => $user->roles->map(fn($role) => [
                 'id' => $role->id,
                 'name' => $role->name,
-                'slug' => $role->slug,
+                'slug' => $role->name,  // Spatie has no slug, map name→slug
             ]),
-            'permissions' => $user->getAllPermissions()->map(fn($perm) => [
-                'id' => $perm->id,
-                'name' => $perm->name,
-                'slug' => $perm->slug,
-                'resource' => $perm->resource,
-                'action' => $perm->action,
-            ])->values(),
+            'permissions' => $user->getAllPermissions()->map(function ($perm) {
+                $parts = explode('.', $perm->name);
+                return [
+                    'id' => $perm->id,
+                    'name' => $perm->name,
+                    'slug' => $perm->name,
+                    'resource' => $parts[0] ?? '',
+                    'action' => $parts[1] ?? '',
+                ];
+            })->values(),
         ];
     }
 }

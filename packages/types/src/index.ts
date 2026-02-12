@@ -12,6 +12,8 @@ export interface User {
   updated_at: string;
   roles: Role[];
   permissions: Permission[];
+  is_impersonating?: boolean;
+  impersonator?: { id: number; name: string; email: string } | null;
 }
 
 export interface AuthTokens {

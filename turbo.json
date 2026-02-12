@@ -4,9 +4,13 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": [".next/**", "!.next/cache/**", "public/build/**"]
+      "outputs": [".next/**", "!.next/cache/**", "public/build/**", "dist/**"]
     },
     "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "web-vuejs#dev": {
       "cache": false,
       "persistent": true
     },

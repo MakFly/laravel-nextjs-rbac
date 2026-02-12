@@ -73,8 +73,10 @@ import {
   TrashIcon,
   PlusIcon,
   SettingsIcon,
+  LogInIcon,
 } from 'lucide-react';
 import { assignRoleAction, removeRoleAction } from '@/lib/api/admin';
+import { useAuthStore } from '@/stores/auth-store';
 import type { User, Role, Permission } from '@rbac/types';
 
 interface UsersDataTableProps {
@@ -249,6 +251,9 @@ export function UsersDataTable({ users, roles, pagination }: UsersDataTableProps
       id: 'actions',
       cell: ({ row }) => {
         const user = row.original;
+        const currentUser = useAuthStore.getState().user;
+        const isCurrentUser = currentUser?.id === user.id;
+        const isTargetAdmin = user.roles.some((r) => r.slug === 'admin');
 
         return (
           <DropdownMenu>
@@ -269,6 +274,15 @@ export function UsersDataTable({ users, roles, pagination }: UsersDataTableProps
                   <ShieldMinusIcon className="mr-2 h-4 w-4" />
                   Remove Role
                 </DropdownMenuItem>
+              )}
+              {!isCurrentUser && !isTargetAdmin && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => handleImpersonate(user.id)}>
+                    <LogInIcon className="mr-2 h-4 w-4" />
+                    Impersonate
+                  </DropdownMenuItem>
+                </>
               )}
             </DropdownMenuContent>
           </DropdownMenu>
@@ -300,6 +314,17 @@ export function UsersDataTable({ users, roles, pagination }: UsersDataTableProps
       },
     },
   });
+
+  const handleImpersonate = (userId: number) => {
+    startTransition(async () => {
+      try {
+        await useAuthStore.getState().impersonate(userId);
+        router.refresh();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Failed to impersonate');
+      }
+    });
+  };
 
   const openAssignDialog = (user: User & { roles: Role[] }) => {
     setSelectedUser(user);

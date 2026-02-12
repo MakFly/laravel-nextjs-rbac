@@ -1,0 +1,38 @@
+export default {
+  login: {
+    title: 'Login to your account',
+    description: 'Enter your email below to login to your account',
+    email: 'Email',
+    password: 'Password',
+    forgotPassword: 'Forgot your password?',
+    loginButton: 'Login',
+    loggingButton: 'Connexion...',
+    autofillButton: 'Autofill (Demo)',
+    orContinue: 'Or continue with',
+    githubLogin: 'Login with GitHub',
+    noAccount: "Don't have an account?",
+    signUp: 'Sign up',
+  },
+  dashboard: {
+    welcome: 'Bienvenue, {name}!',
+    description: 'Voici votre dashboard personnel',
+    logout: 'Se déconnecter',
+    revenue: 'Revenue Total',
+    subscriptions: 'Abonnements',
+    sales: 'Ventes',
+    activity: 'Activité',
+    revenueChart: 'Aperçu des revenus',
+    chartPlaceholder: 'Graphique des revenus (placeholder)',
+  },
+  notFound: {
+    title: 'Page non trouvée',
+    description: "Désolé, la page que vous recherchez n'existe pas ou a été déplacée.",
+    back: 'Retour',
+    home: 'Accueil',
+  },
+  auth: {
+    loginSuccess: 'Connexion réussie!',
+    loginError: 'Erreur lors de la connexion',
+    logoutSuccess: 'Déconnexion réussie!',
+  },
+} as const
