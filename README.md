@@ -1,39 +1,65 @@
-# Laravel + Next.js RBAC
+# Laravel + Next.js + Vue.js RBAC
 
-A secure, production-ready RBAC (Role-Based Access Control) system using a **BFF (Backend For Frontend)** architecture with Laravel API and Next.js frontend.
+A secure, production-ready RBAC (Role-Based Access Control) system with **dual frontend architecture**:
+
+- **Next.js** (App Router) — BFF pattern with Laravel Sanctum
+- **Vue.js 3 SPA** — Direct API calls with session-based Sanctum auth
 
 ## Architecture
 
-This project implements a BFF pattern where Next.js acts as an intermediary between the browser and Laravel API:
-
 ```
-┌─────────┐       ┌─────────────┐       ┌────────────┐
-│ Browser │──────▶│  Next.js    │──────▶│  Laravel   │
-│         │◀──────│  (BFF)      │◀──────│    API     │
-└─────────┘       └─────────────┘       └────────────┘
-                          │
-                          ├─ HMAC Signing
-                          ├─ Cookie Management
-                          └─ Route Proxying
+┌─────────────────────────────────────────────────────────────────────┐
+│                         DUAL AUTH SYSTEM                            │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  NEXT.JS BFF (Port 3001)          │    VUE.JS SPA (Port 5173)       │
+│  ─────────────────────            │    ────────────────────         │
+│                                   │                                 │
+│  ┌─────────┐    ┌───────────┐     │    ┌─────────┐                  │
+│  │ Browser │───▶│  Next.js  │     │    │ Browser │                  │
+│  └─────────┘    │  Server   │     │    └────┬────┘                  │
+│       ▲         │  Actions  │     │         │                       │
+│       │         └─────┬─────┘     │         │                       │
+│       │               │           │         ▼                       │
+│  HttpOnly        Server-side      │    ┌───────────┐                │
+│  Cookies         fetch()          │    │  Vue.js   │                │
+│       │               │           │    │  Client   │                │
+│       │               ▼           │    └─────┬─────┘                │
+│       │         ┌───────────┐     │          │                      │
+│       │         │           │     │          │ credentials:         │
+│       │         │  Laravel  │◀────┼──────────┤   'include'          │
+│       └─────────│    API    │     │          │ X-XSRF-TOKEN         │
+│        Set-Cook│  (Sanctum) │     │          ▼                      │
+│       ie        │           │     │    ┌───────────┐                │
+│                 └───────────┘     │    │  Laravel  │                │
+│                                   │    │    API    │                │
+│                                   │    └───────────┘                │
+│                                   │                                 │
+│  Route: /api/v1/* (BFF proxy)     │  Route: /api/spa/* (direct)     │
+│                                   │                                 │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
-### Key Benefits
+### Key Features
 
-- **Security**: HMAC-signed requests prevent request forgery between BFF and API
-- **No CORS Issues**: Server-to-server communication eliminates browser CORS restrictions
-- **HttpOnly Cookies**: Authentication tokens stored securely, inaccessible to XSS attacks
-- **Type Safety**: Full TypeScript support across the stack
-- **Monorepo**: Unified development experience with Turbo
+| Feature | Next.js BFF | Vue.js SPA |
+|---------|-------------|------------|
+| **Auth** | Sanctum session (via server) | Sanctum session (direct) |
+| **CSRF** | Server-side forwarding | `X-XSRF-TOKEN` header |
+| **Cookies** | Forwarded manually | `credentials: 'include'` |
+| **Security** | No token in browser JS | HttpOnly cookies |
 
 ## Tech Stack
 
 | Component | Technology |
 |-----------|------------|
 | **Monorepo** | Turbo + Bun |
-| **Frontend** | Next.js 15 (App Router) + React 19 + TypeScript |
+| **Frontend 1** | Next.js 15 (App Router) + React 19 |
+| **Frontend 2** | Vue.js 3 + Vite + Pinia |
 | **Backend** | Laravel 11 + Sanctum |
-| **UI** | Radix UI + Tailwind CSS + Lucide React |
-| **Security** | HMAC-SHA256 signing |
+| **RBAC** | spatie/laravel-permission |
+| **UI** | shadcn/ui (both frontends) |
+| **Styling** | Tailwind CSS v4 |
 
 ## Project Structure
 
@@ -41,295 +67,215 @@ This project implements a BFF pattern where Next.js acts as an intermediary betw
 laravel-nextjs-rbac/
 ├── apps/
 │   ├── web/                          # Next.js BFF (port 3001)
-│   │   ├── src/
-│   │   │   ├── app/
-│   │   │   │   ├── api/v1/[...path]/ # BFF Proxy Route Handler
-│   │   │   │   └── (routes)/         # Frontend pages
-│   │   │   └── lib/
-│   │   │       ├── api/
-│   │   │       │   └── auth.ts       # Server Actions
-│   │   │       └── security/
-│   │   │           └── hmac.ts       # HMAC signing logic
-│   │   └── package.json
+│   │   └── src/
+│   │       ├── app/
+│   │       │   ├── api/spa/[...path] # BFF proxy to Laravel
+│   │       │   └── (routes)/         # Frontend pages
+│   │       └── lib/api/
+│   │           ├── auth.ts           # Server Actions
+│   │           └── laravel.ts        # Laravel client + CSRF
+│   │
+│   ├── web-vuejs/                    # Vue.js SPA (port 5173)
+│   │   └── src/
+│   │       ├── lib/api/              # API client with CSRF
+│   │       ├── stores/               # Pinia stores
+│   │       ├── views/                # Pages
+│   │       └── components/           # UI components
+│   │
 │   └── api/                          # Laravel API (port 8000)
-│       ├── app/
-│       │   └── Http/
-│       │       └── Middleware/
-│       │           └── ValidateBffSignature.php
-│       └── bootstrap/app.php
-├── package.json                      # Monorepo root
-├── turbo.json                        # Turbo configuration
-└── README.md
+│       └── routes/api.php
+│           ├── /api/v1/*             # BFF routes (Passport)
+│           └── /api/spa/*            # SPA routes (Sanctum)
+│
+├── packages/types/                   # Shared TypeScript types
+├── docs/CSRF-EXPLAINED.md            # CSRF documentation
+├── Makefile                          # Dev commands
+└── turbo.json
 ```
 
-## How the BFF Works
-
-### Request Flow
-
-Every request from the browser goes through the BFF proxy at `/api/v1/[...path]/route.ts`:
-
-```
-1. Browser → /api/v1/auth/login
-              ↓
-2. Next.js BFF Proxy validates request
-              ↓
-3. Generates HMAC signature (X-BFF-Signature)
-              ↓
-4. Forwards to Laravel API with auth token from cookie
-              ↓
-5. Laravel validates HMAC signature
-              ↓
-6. Returns response through BFF to browser
-```
-
-### HMAC Signing
-
-The BFF and Laravel share a secret key used to sign requests:
-
-**Signature Payload:**
-```
-TIMESTAMP:METHOD:PATH:BODY_HASH
-```
-
-**Headers sent to Laravel:**
-- `X-BFF-Id`: BFF identifier
-- `X-BFF-Timestamp`: Unix timestamp in seconds
-- `X-BFF-Signature`: HMAC-SHA256 signature
-
-**Why HMAC?**
-- Prevents request forgery: only someone with the secret can generate valid signatures
-- Ensures request integrity: any modification invalidates the signature
-- Timestamp prevents replay attacks
-
-### Cookie Authentication
-
-Authentication uses **HttpOnly cookies** for maximum security:
-
-**Login Flow:**
-```
-1. User submits credentials → Server Action
-2. BFF forwards to Laravel /auth/login
-3. Laravel validates and returns access_token
-4. BFF stores token in HttpOnly cookie (auth_token)
-5. Subsequent requests include cookie automatically
-```
-
-**Cookie Attributes:**
-- `httpOnly: true` - Inaccessible to JavaScript (XSS protection)
-- `secure: true` (production) - Only sent over HTTPS
-- `sameSite: 'lax'` - CSRF protection
-- `maxAge: 15 days` - Persistent session
-
-**Critical Rule**: When making fetch requests from Server Actions, **NEVER** use `credentials: 'include'`. This is ignored server-side. Always pass cookies manually:
-
-```typescript
-'use server';
-
-// ❌ WRONG - credentials: 'include' is ignored server-side
-const response = await fetch(url, { credentials: 'include' });
-
-// ✅ CORRECT - pass cookie manually in headers
-const cookieStore = await cookies();
-const authToken = cookieStore.get('auth_token');
-const response = await fetch(url, {
-  headers: { Cookie: `auth_token=${authToken?.value}` }
-});
-```
-
-## Security Features
-
-### 1. Path Validation
-The BFF proxy validates all path segments to prevent SSRF and path traversal attacks:
-
-```typescript
-const VALID_PATH_SEGMENT = /^[a-zA-Z0-9_-]+$/;
-```
-
-### 2. Public Routes
-Certain routes don't require authentication:
-- `/api/v1/auth/login`
-- `/api/v1/auth/register`
-- `/api/v1/auth/providers`
-
-### 3. Host Verification
-The BFF verifies that all proxied requests go to the configured Laravel API host.
-
-### 4. Request Timeout
-All proxied requests have a 30-second timeout to prevent hanging.
-
-## Getting Started
+## Quick Start
 
 ### Prerequisites
 
-- **Node.js** 18+
 - **PHP** 8.2+
-- **Composer**
+- **Node.js** 18+
 - **Bun** (package manager)
+- **Composer**
 
 ### Installation
 
-1. **Clone the repository:**
-   ```bash
-   git clone <repository-url>
-   cd laravel-nextjs-rbac
-   ```
+```bash
+# Clone & install
+git clone <repository-url>
+cd laravel-nextjs-rbac
+bun install
+cd apps/api && composer install
 
-2. **Install dependencies:**
-   ```bash
-   bun install
-   cd apps/api && composer install
-   ```
-
-3. **Configure environment variables:**
-
-   **Next.js BFF** (`.env.local`):
-   ```env
-   NEXT_PUBLIC_APP_URL=http://localhost:3001
-   LARAVEL_API_URL=http://localhost:8000
-
-   # HMAC Configuration (must match Laravel)
-   BFF_HMAC_SECRET=your-secret-key-here
-   BFF_ID=nextjs-bff-prod
-   ```
-
-   **Laravel API** (`.env`):
-   ```env
-   APP_URL=http://localhost:8000
-   SANCTUM_STATEFUL_DOMAINS=localhost:3001
-
-   # BFF Configuration (must match Next.js)
-   BFF_ID=nextjs-bff-prod
-   BFF_SECRET=your-secret-key-here
-   ```
-
-4. **Generate Laravel app key:**
-   ```bash
-   cd apps/api
-   php artisan key:generate
-   ```
-
-5. **Run database migrations:**
-   ```bash
-   php artisan migrate
-   ```
+# Setup Laravel
+cp .env.example .env
+php artisan key:generate
+php artisan migrate --seed
+```
 
 ### Development
 
-Run both applications in development mode:
-
 ```bash
-# Terminal 1 - Next.js BFF
-bun run --filter @rbac/web dev
+# All services (recommended)
+make dev
 
-# Terminal 2 - Laravel API
-cd apps/api && php artisan serve
+# Or individually:
+make dev-api      # Laravel (port 8000)
+make dev-web      # Next.js (port 3001)
+make dev-vue      # Vue.js (port 5173)
 ```
 
-Access the application at:
-- **Frontend**: http://localhost:3001
-- **API**: http://localhost:8000
+| Service | URL |
+|---------|-----|
+| Next.js BFF | http://localhost:3001 |
+| Vue.js SPA | http://localhost:5173 |
+| Laravel API | http://localhost:8000 |
 
-### Build for Production
+## Authentication Flow
 
-```bash
-# Build all packages
-bun run build
+### Next.js BFF (Server Actions)
 
-# Build specific app
-bun run --filter @rbac/web build
+```
+1. Browser → Server Action (loginAction)
+2. Server calls initCsrfServer() → GET /sanctum/csrf-cookie
+3. Server forwards cookies + X-XSRF-TOKEN to Laravel
+4. Laravel sets session cookie → forwarded to browser
+5. Subsequent requests: cookies forwarded server-side
 ```
 
-## API Endpoints
+**Key Point**: `credentials: 'include'` does NOT work in Server Actions. Cookies must be forwarded manually.
 
-### Authentication
+### Vue.js SPA (Client)
+
+```
+1. Browser → initCsrf() → GET /sanctum/csrf-cookie
+2. Laravel sets XSRF-TOKEN cookie (readable by JS)
+3. Login → POST with X-XSRF-TOKEN header + credentials: 'include'
+4. Laravel sets laravel_session (HttpOnly)
+5. Subsequent requests: browser sends cookies automatically
+```
+
+## API Routes
+
+| Prefix | Auth | Usage |
+|--------|------|-------|
+| `/api/v1/*` | Passport | Next.js BFF |
+| `/api/spa/*` | Sanctum | Vue.js SPA |
+| `/sanctum/csrf-cookie` | Public | CSRF token init |
+
+### Endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/v1/auth/login` | POST | Login with email/password |
-| `/api/v1/auth/register` | POST | Register new user |
-| `/api/v1/auth/logout` | POST | Logout user |
-| `/api/v1/auth/me` | GET | Get current user |
-| `/api/v1/auth/providers` | GET | List OAuth providers |
+| `/auth/login` | POST | Login |
+| `/auth/register` | POST | Register |
+| `/auth/logout` | POST | Logout |
+| `/me` | GET | Current user |
+| `/auth/providers` | GET | OAuth providers |
 
-### Example Request
+## RBAC (spatie/laravel-permission)
 
-```typescript
-// Using Server Actions
-import { login } from '@/lib/api/auth';
-
-async function handleLogin(formData: FormData) {
-  const result = await login(formData);
-  if (result.error) {
-    // Handle error
-  }
-  // Success - cookie is set automatically
-}
-```
-
-## Middleware
-
-### Laravel BFF Validation
-
-The Laravel API validates all incoming BFF requests via middleware:
+### Roles & Permissions
 
 ```php
-// apps/api/app/Http/Middleware/ValidateBffSignature.php
-class ValidateBffSignature
-{
-    public function handle(Request $request, Closure $next)
-    {
-        // 1. Extract BFF headers
-        // 2. Reconstruct signature payload
-        // 3. Verify HMAC signature
-        // 4. Check timestamp (replay protection)
-    }
-}
+// Seeders create default roles:
+- Super Admin (all permissions)
+- Admin (user management)
+- Editor (content management)
+- User (basic access)
 ```
+
+### Usage in Code
+
+```php
+// Laravel
+$user->hasPermissionTo('edit users');
+$user->hasRole('admin');
+
+// Blade
+@role('admin')
+    <!-- Admin content -->
+@endrole
+```
+
+## Environment Variables
+
+### Next.js (`apps/web/.env.local`)
+
+```env
+NEXT_PUBLIC_APP_URL=http://localhost:3001
+LARAVEL_API_URL=http://localhost:8000
+```
+
+### Vue.js (`apps/web-vuejs/.env.local`)
+
+```env
+VITE_APP_URL=http://localhost:5173
+VITE_LARAVEL_API_URL=http://localhost:8000
+```
+
+### Laravel (`apps/api/.env`)
+
+```env
+APP_URL=http://localhost:8000
+FRONTEND_URL=http://localhost:3001
+VUE_FRONTEND_URL=http://localhost:5173
+
+SANCTUM_STATEFUL_DOMAINS=localhost:3001,localhost:5173
+SESSION_DOMAIN=localhost
+```
+
+## CSRF Protection
+
+Both frontends use CSRF tokens with Laravel Sanctum. See [docs/CSRF-EXPLAINED.md](docs/CSRF-EXPLAINED.md) for detailed explanation.
+
+**Summary:**
+- CSRF tokens protect against Cross-Site Request Forgery
+- Required because cookies are sent automatically by browsers
+- Token proves request comes from YOUR frontend, not a malicious site
 
 ## Troubleshooting
 
-### HMAC Signature Mismatch
+### 419 CSRF Token Mismatch
 
-**Symptom**: Laravel returns 401/403 with "Invalid signature"
+**Next.js**: Call `initCsrfServer()` before POST requests
+**Vue.js**: Call `initCsrf()` before POST requests
 
-**Solutions**:
-1. Verify `BFF_HMAC_SECRET` matches `BFF_SECRET` exactly
-2. Check system time sync (timestamp validation)
-3. Ensure request body is JSON with sorted keys
+### Session Not Persisting
 
-### Cookies Not Being Sent
+1. Check `SANCTUM_STATEFUL_DOMAINS` includes your frontend URL
+2. Verify `SESSION_DOMAIN` is correct
+3. Ensure cookies are not blocked by browser
 
-**Symptom**: Authenticated requests return 401
+### CORS Errors (Vue.js only)
 
-**Solutions**:
-1. Check that `credentials: 'include'` is NOT used in Server Actions
-2. Verify cookie is set with `httpOnly: true`
-3. Check `sameSite` attribute matches domain configuration
-4. Ensure `SANCTUM_STATEFUL_DOMAINS` includes BFF domain
+1. Vite proxy should forward `/api/spa/*` to Laravel
+2. Check `cors.php` configuration in Laravel
 
-### CORS Issues
+## Commands
 
-**Symptom**: Browser blocks requests with CORS errors
+```bash
+# Monorepo
+bun install              # Install dependencies
+bun run build            # Build all packages
+make dev                 # Start all services
 
-**Solutions**:
-- Should not occur with BFF architecture (server-to-server)
-- If seeing CORS, verify request is going through `/api/v1/` proxy
+# Individual services
+make dev-api             # Laravel only
+make dev-web             # Next.js only
+make dev-vue             # Vue.js only
 
-## Contributing
-
-Contributions are welcome! Please ensure:
-
-1. All tests pass: `bun test`
-2. Code follows existing patterns
-3. Security best practices are maintained
-4. HMAC signing is never bypassed
+# Laravel
+cd apps/api
+php artisan migrate      # Run migrations
+php artisan db:seed      # Seed database
+php artisan test         # Run tests
+```
 
 ## License
 
-MIT License - see LICENSE file for details
-
-## Additional Resources
-
-- [Next.js App Router Documentation](https://nextjs.org/docs/app)
-- [Laravel Sanctum Documentation](https://laravel.com/docs/sanctum)
-- [HMAC Authentication Best Practices](https://www.owlstown.com/resources/hmac)
+MIT License
