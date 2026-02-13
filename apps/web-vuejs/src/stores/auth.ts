@@ -26,6 +26,7 @@ export const useAuthStore = defineStore('auth', () => {
   const isAdmin = computed(() => hasRole('admin'))
   const isImpersonating = computed(() => user.value?.is_impersonating ?? false)
   const impersonator = computed(() => user.value?.impersonator ?? null)
+  const needsOnboarding = computed(() => !!user.value && user.value.onboarding_status !== 'completed')
 
   async function initialize() {
     if (initialized.value) return
@@ -40,6 +41,14 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  async function refreshUser() {
+    try {
+      user.value = await authApi.getCurrentUser()
+    } catch {
+      user.value = null
+    }
+  }
+
   async function login(email: string, password: string) {
     isLoading.value = true
     error.value = null
@@ -50,6 +59,22 @@ export const useAuthStore = defineStore('auth', () => {
     } catch (err: unknown) {
       const apiErr = err as { message?: string }
       error.value = apiErr.message || 'Login failed'
+      throw err
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  async function register(name: string, email: string, password: string, password_confirmation: string) {
+    isLoading.value = true
+    error.value = null
+    try {
+      const response = await authApi.register({ name, email, password, password_confirmation })
+      user.value = response.user
+      initialized.value = true
+    } catch (err: unknown) {
+      const apiErr = err as { message?: string }
+      error.value = apiErr.message || 'Registration failed'
       throw err
     } finally {
       isLoading.value = false
@@ -106,10 +131,13 @@ export const useAuthStore = defineStore('auth', () => {
     isAdmin,
     isImpersonating,
     impersonator,
+    needsOnboarding,
     hasPermission,
     hasRole,
     initialize,
+    refreshUser,
     login,
+    register,
     logout,
     impersonate,
     stopImpersonation,

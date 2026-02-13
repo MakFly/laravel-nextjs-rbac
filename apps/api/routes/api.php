@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\OAuthController;
+use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Admin\RoleController;
@@ -81,29 +82,41 @@ Route::prefix('v1')
             });
 
             Route::get('/me', [AuthController::class, 'me']);
-            Route::get('/users', [UserController::class, 'index']);
 
-            // Admin routes
-            Route::middleware('role:admin')->prefix('admin')->group(function () {
-                Route::get('/users', [AdminUserController::class, 'index']);
-                Route::get('/users/{user}', [AdminUserController::class, 'show']);
-                Route::post('/users/{user}/roles', [AdminUserController::class, 'assignRole']);
-                Route::delete('/users/{user}/roles/{role}', [AdminUserController::class, 'removeRole']);
-
-                Route::get('/roles', [RoleController::class, 'index']);
-                Route::post('/roles', [RoleController::class, 'store']);
-                Route::post('/roles/{role}/permissions', [RoleController::class, 'updatePermissions']);
-
-                Route::get('/permissions', [PermissionController::class, 'index']);
+            // Onboarding routes (accessible before onboarding is complete)
+            Route::prefix('onboarding')->group(function () {
+                Route::get('/status', [OnboardingController::class, 'status']);
+                Route::get('/draft', [OnboardingController::class, 'getDraft']);
+                Route::post('/step/{step}', [OnboardingController::class, 'saveStep'])->where('step', '[1-4]');
+                Route::post('/complete', [OnboardingController::class, 'complete']);
             });
 
-            // Permission-based route examples
-            Route::middleware('permission:posts.read')->get('/posts', function () {
-                return response()->json(['message' => 'Posts list - you have posts.read permission']);
-            });
+            // Routes requiring completed onboarding
+            Route::middleware('onboarding.complete')->group(function () {
+                Route::get('/users', [UserController::class, 'index']);
 
-            Route::middleware('permission:posts.create')->post('/posts', function () {
-                return response()->json(['message' => 'Create post - you have posts.create permission']);
+                // Admin routes
+                Route::middleware('role:admin')->prefix('admin')->group(function () {
+                    Route::get('/users', [AdminUserController::class, 'index']);
+                    Route::get('/users/{user}', [AdminUserController::class, 'show']);
+                    Route::post('/users/{user}/roles', [AdminUserController::class, 'assignRole']);
+                    Route::delete('/users/{user}/roles/{role}', [AdminUserController::class, 'removeRole']);
+
+                    Route::get('/roles', [RoleController::class, 'index']);
+                    Route::post('/roles', [RoleController::class, 'store']);
+                    Route::post('/roles/{role}/permissions', [RoleController::class, 'updatePermissions']);
+
+                    Route::get('/permissions', [PermissionController::class, 'index']);
+                });
+
+                // Permission-based route examples
+                Route::middleware('permission:posts.read')->get('/posts', function () {
+                    return response()->json(['message' => 'Posts list - you have posts.read permission']);
+                });
+
+                Route::middleware('permission:posts.create')->post('/posts', function () {
+                    return response()->json(['message' => 'Create post - you have posts.create permission']);
+                });
             });
         });
     });
@@ -127,35 +140,47 @@ Route::prefix('spa')->group(function () {
 
         Route::post('/auth/logout', [AuthController::class, 'spaLogout']);
         Route::get('/me', [AuthController::class, 'me']);
-        Route::get('/users', [UserController::class, 'index']);
 
-        // Admin routes
-        Route::middleware('role:admin')->prefix('admin')->group(function () {
-            Route::get('/users', [AdminUserController::class, 'index']);
-            Route::get('/users/{user}', [AdminUserController::class, 'show']);
-            Route::post('/users/{user}/roles', [AdminUserController::class, 'assignRole']);
-            Route::delete('/users/{user}/roles/{role}', [AdminUserController::class, 'removeRole']);
-
-            Route::get('/roles', [RoleController::class, 'index']);
-            Route::post('/roles', [RoleController::class, 'store']);
-            Route::post('/roles/{role}/permissions', [RoleController::class, 'updatePermissions']);
-
-            Route::get('/permissions', [PermissionController::class, 'index']);
-
-            // Impersonation (start) - requires admin role
-            Route::post('/impersonate/{user}', [ImpersonationController::class, 'impersonate']);
+        // Onboarding routes (accessible before onboarding is complete)
+        Route::prefix('onboarding')->group(function () {
+            Route::get('/status', [OnboardingController::class, 'status']);
+            Route::get('/draft', [OnboardingController::class, 'getDraft']);
+            Route::post('/step/{step}', [OnboardingController::class, 'saveStep'])->where('step', '[1-4]');
+            Route::post('/complete', [OnboardingController::class, 'complete']);
         });
 
-        // Stop impersonation - OUTSIDE admin group (impersonated user is not admin)
-        Route::post('/admin/stop-impersonate', [ImpersonationController::class, 'stopImpersonating']);
+        // Routes requiring completed onboarding
+        Route::middleware('onboarding.complete')->group(function () {
+            Route::get('/users', [UserController::class, 'index']);
 
-        // Permission-based route examples
-        Route::middleware('permission:posts.read')->get('/posts', function () {
-            return response()->json(['message' => 'Posts list - you have posts.read permission']);
-        });
+            // Admin routes
+            Route::middleware('role:admin')->prefix('admin')->group(function () {
+                Route::get('/users', [AdminUserController::class, 'index']);
+                Route::get('/users/{user}', [AdminUserController::class, 'show']);
+                Route::post('/users/{user}/roles', [AdminUserController::class, 'assignRole']);
+                Route::delete('/users/{user}/roles/{role}', [AdminUserController::class, 'removeRole']);
 
-        Route::middleware('permission:posts.create')->post('/posts', function () {
-            return response()->json(['message' => 'Create post - you have posts.create permission']);
+                Route::get('/roles', [RoleController::class, 'index']);
+                Route::post('/roles', [RoleController::class, 'store']);
+                Route::post('/roles/{role}/permissions', [RoleController::class, 'updatePermissions']);
+
+                Route::get('/permissions', [PermissionController::class, 'index']);
+
+                // Impersonation (start) - requires admin role
+                Route::post('/impersonate/{user}', [ImpersonationController::class, 'impersonate']);
+            });
+
+            // Stop impersonation - OUTSIDE admin group (impersonated user is not admin)
+            Route::post('/admin/stop-impersonate', [ImpersonationController::class, 'stopImpersonating']);
+
+            // Permission-based route examples
+            Route::middleware('permission:posts.read')->get('/posts', function () {
+                return response()->json(['message' => 'Posts list - you have posts.read permission']);
+            });
+
+            Route::middleware('permission:posts.create')->post('/posts', function () {
+                return response()->json(['message' => 'Create post - you have posts.create permission']);
+            });
         });
     });
 });

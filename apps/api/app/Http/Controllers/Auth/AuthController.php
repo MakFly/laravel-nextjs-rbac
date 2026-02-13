@@ -24,6 +24,8 @@ class AuthController extends Controller
             'name' => $validated['name'],
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
+            'onboarding_status' => 'pending',
+            'onboarding_step' => 1,
         ]);
 
         // Assign default role
@@ -135,6 +137,8 @@ class AuthController extends Controller
             'name' => $validated['name'],
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
+            'onboarding_status' => 'pending',
+            'onboarding_step' => 1,
         ]);
 
         $user->assignRole('user');
@@ -189,6 +193,8 @@ class AuthController extends Controller
             'name' => $user->name,
             'email' => $user->email,
             'email_verified_at' => $user->email_verified_at,
+            'onboarding_status' => $user->onboarding_status ?? 'pending',
+            'onboarding_step' => $user->onboarding_step ?? 1,
             'created_at' => $user->created_at,
             'updated_at' => $user->updated_at,
             'roles' => $user->roles->map(fn($role) => [

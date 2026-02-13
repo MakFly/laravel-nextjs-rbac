@@ -99,6 +99,8 @@ class RbacSeeder extends Seeder
                     'name' => $userData['name'],
                     'password' => bcrypt('password'),
                     'email_verified_at' => now(),
+                    'onboarding_status' => 'completed',
+                    'onboarding_step' => 4,
                 ]
             );
             $testUser->assignRole($roleMap[$userData['role']]);

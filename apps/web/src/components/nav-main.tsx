@@ -16,6 +16,7 @@ import {
   SidebarMenuSubItem,
 } from "@/components/ui/sidebar"
 import { cn } from "@/lib/utils"
+import { toast } from "sonner"
 
 type NavItem = {
   title: string
@@ -30,9 +31,11 @@ type NavItem = {
 export function NavMain({
   items,
   showQuickCreate = true,
+  disabled = false,
 }: {
   items: NavItem[]
   showQuickCreate?: boolean
+  disabled?: boolean
 }) {
   const [openMenus, setOpenMenus] = React.useState<Record<string, boolean>>({})
 
@@ -68,49 +71,72 @@ export function NavMain({
           </SidebarMenu>
         )}
         <SidebarMenu>
-          {items.map((item) => (
-            <SidebarMenuItem key={item.title}>
-              {item.items && item.items.length > 0 ? (
-                // Item avec sous-menu
-                <>
+          {items.map((item) => {
+            const isDashboard = item.url === "/dashboard"
+            const isDisabled = disabled && !isDashboard
+
+            const handleDisabledClick = (e: React.MouseEvent) => {
+              e.preventDefault()
+              toast.info("Complete your onboarding first", {
+                description: "You need to finish setting up your profile to access this section.",
+              })
+            }
+
+            return (
+              <SidebarMenuItem key={item.title}>
+                {item.items && item.items.length > 0 ? (
+                  // Item avec sous-menu
+                  <>
+                    <SidebarMenuButton
+                      tooltip={item.title}
+                      onClick={isDisabled ? handleDisabledClick : () => toggleMenu(item.title)}
+                      className={cn(isDisabled && "opacity-50 cursor-not-allowed")}
+                    >
+                      {item.icon && <item.icon />}
+                      <span>{item.title}</span>
+                      <ChevronRightIcon
+                        className={cn(
+                          "ml-auto size-4 transition-transform",
+                          openMenus[item.title] && "rotate-90"
+                        )}
+                      />
+                    </SidebarMenuButton>
+                    {!isDisabled && openMenus[item.title] && (
+                      <SidebarMenuSub>
+                        {item.items.map((subItem) => (
+                          <SidebarMenuSubItem key={subItem.title}>
+                            <SidebarMenuSubButton asChild>
+                              <Link href={subItem.url as any}>
+                                <span>{subItem.title}</span>
+                              </Link>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        ))}
+                      </SidebarMenuSub>
+                    )}
+                  </>
+                ) : isDisabled ? (
+                  // Item disabled - no link
                   <SidebarMenuButton
                     tooltip={item.title}
-                    onClick={() => toggleMenu(item.title)}
+                    onClick={handleDisabledClick}
+                    className="opacity-50 cursor-not-allowed"
                   >
                     {item.icon && <item.icon />}
                     <span>{item.title}</span>
-                    <ChevronRightIcon
-                      className={cn(
-                        "ml-auto size-4 transition-transform",
-                        openMenus[item.title] && "rotate-90"
-                      )}
-                    />
                   </SidebarMenuButton>
-                  {openMenus[item.title] && (
-                    <SidebarMenuSub>
-                      {item.items.map((subItem) => (
-                        <SidebarMenuSubItem key={subItem.title}>
-                          <SidebarMenuSubButton asChild>
-                            <Link href={subItem.url as any}>
-                              <span>{subItem.title}</span>
-                            </Link>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                      ))}
-                    </SidebarMenuSub>
-                  )}
-                </>
-              ) : (
-                // Item sans sous-menu - lien direct
-                <SidebarMenuButton tooltip={item.title} asChild>
-                  <Link href={item.url as any}>
-                    {item.icon && <item.icon />}
-                    <span>{item.title}</span>
-                  </Link>
-                </SidebarMenuButton>
-              )}
-            </SidebarMenuItem>
-          ))}
+                ) : (
+                  // Item sans sous-menu - lien direct
+                  <SidebarMenuButton tooltip={item.title} asChild>
+                    <Link href={item.url as any}>
+                      {item.icon && <item.icon />}
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                )}
+              </SidebarMenuItem>
+            )
+          })}
         </SidebarMenu>
       </SidebarGroupContent>
     </SidebarGroup>

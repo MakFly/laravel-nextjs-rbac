@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Passport\HasApiTokens;
@@ -21,6 +22,8 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'onboarding_status',
+        'onboarding_step',
     ];
 
     protected $hidden = [
@@ -45,6 +48,21 @@ class User extends Authenticatable
         return $this->hasMany(OAuthProvider::class);
     }
 
+    public function kycProfile(): HasOne
+    {
+        return $this->hasOne(KycProfile::class);
+    }
+
+    public function userOperation(): HasOne
+    {
+        return $this->hasOne(UserOperation::class);
+    }
+
+    public function onboardingDraft(): HasOne
+    {
+        return $this->hasOne(OnboardingDraft::class);
+    }
+
     // =========================================================================
     // Convenience Methods
     // =========================================================================
@@ -58,5 +76,10 @@ class User extends Authenticatable
     {
         return $this->hasPermissionTo("{$resource}.{$action}")
             || $this->hasPermissionTo("{$resource}.manage");
+    }
+
+    public function hasCompletedOnboarding(): bool
+    {
+        return $this->onboarding_status === 'completed';
     }
 }

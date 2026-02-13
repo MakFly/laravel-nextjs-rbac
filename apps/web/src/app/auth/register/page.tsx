@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { ShieldIcon, MailIcon, LockIcon, UserIcon, ArrowRightIcon, LoaderIcon, CheckCircleIcon, Wand2Icon } from "lucide-react"
+import { ShieldIcon, MailIcon, LockIcon, UserIcon, ArrowRightIcon, LoaderIcon, CheckCircleIcon, Wand2Icon, EyeIcon, EyeOffIcon } from "lucide-react"
 import { Separator } from "@/components/ui/separator"
 
 export default function RegisterPage() {
@@ -20,6 +20,8 @@ export default function RegisterPage() {
   const [passwordConfirmation, setPasswordConfirmation] = useState("")
   const [error, setError] = useState("")
   const [submitting, setSubmitting] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const [showPasswordConfirmation, setShowPasswordConfirmation] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -44,7 +46,7 @@ export default function RegisterPage() {
         password,
         password_confirmation: passwordConfirmation,
       })
-      router.push("/dashboard")
+      router.push("/onboarding")
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed")
     } finally {
@@ -193,14 +195,22 @@ export default function RegisterPage() {
                 <LockIcon className="absolute left-3 top-3 h-5 w-5 text-muted-foreground pointer-events-none" />
                 <Input
                   id="password"
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="pl-10 h-11"
+                  className="pl-10 pr-10 h-11"
                   required
                   minLength={8}
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-3 text-muted-foreground hover:text-foreground transition-colors"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+                </button>
               </div>
               <p className="text-xs text-muted-foreground">Must be at least 8 characters</p>
             </div>
@@ -211,17 +221,28 @@ export default function RegisterPage() {
                 <LockIcon className="absolute left-3 top-3 h-5 w-5 text-muted-foreground pointer-events-none" />
                 <Input
                   id="password_confirmation"
-                  type="password"
+                  type={showPasswordConfirmation ? "text" : "password"}
                   placeholder="••••••••"
                   value={passwordConfirmation}
                   onChange={(e) => setPasswordConfirmation(e.target.value)}
-                  className={`pl-10 h-11 ${passwordsMatch ? "pr-10" : ""}`}
+                  className={`pl-10 pr-10 h-11`}
                   required
                   minLength={8}
                 />
-                {passwordsMatch && (
-                  <CheckCircleIcon className="absolute right-3 top-3 h-5 w-5 text-green-600" />
-                )}
+                <button
+                  type="button"
+                  onClick={() => setShowPasswordConfirmation(!showPasswordConfirmation)}
+                  className="absolute right-3 top-3 text-muted-foreground hover:text-foreground transition-colors"
+                  tabIndex={-1}
+                >
+                  {passwordsMatch ? (
+                    <CheckCircleIcon className="h-5 w-5 text-green-600" />
+                  ) : showPasswordConfirmation ? (
+                    <EyeOffIcon className="h-5 w-5" />
+                  ) : (
+                    <EyeIcon className="h-5 w-5" />
+                  )}
+                </button>
               </div>
             </div>
 

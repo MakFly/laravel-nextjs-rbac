@@ -41,6 +41,7 @@ interface AuthState {
 
   // Computed
   isAuthenticated: () => boolean;
+  needsOnboarding: () => boolean;
   hasPermission: (resource: string, action: PermissionAction) => boolean;
   hasRole: (roleSlug: RoleSlug) => boolean;
   isAdmin: () => boolean;
@@ -150,6 +151,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   // Computed helpers
   isAuthenticated: () => !!get().user,
+
+  needsOnboarding: () => get().user?.onboarding_status !== 'completed',
 
   hasPermission: (resource, action) => {
     const { user } = get();

@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Eye, EyeOff } from 'lucide-vue-next'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { toast } from 'vue-sonner'
@@ -28,6 +29,7 @@ const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 const apiError = ref<string | null>(null)
+const showPassword = ref(false)
 
 const redirectTo = (route.query.redirectTo as string) || '/dashboard'
 
@@ -130,12 +132,23 @@ const onSubmit = handleSubmit(async (values) => {
             Forgot your password?
           </a>
         </div>
-        <Input
-          id="password"
-          type="password"
-          v-model="passwordValue"
-          class="h-11"
-        />
+        <div class="relative">
+          <Input
+            id="password"
+            :type="showPassword ? 'text' : 'password'"
+            v-model="passwordValue"
+            class="h-11 pr-10"
+          />
+          <button
+            type="button"
+            class="absolute right-3 top-3 text-muted-foreground hover:text-foreground transition-colors"
+            tabindex="-1"
+            @click="showPassword = !showPassword"
+          >
+            <EyeOff v-if="showPassword" class="size-5" />
+            <Eye v-else class="size-5" />
+          </button>
+        </div>
         <p v-if="passwordError" class="text-destructive text-sm font-normal">
           {{ passwordError }}
         </p>
@@ -191,7 +204,7 @@ const onSubmit = handleSubmit(async (values) => {
       </div>
       <FieldDescription class="text-center">
         Don't have an account?
-        <a href="#">Sign up</a>
+        <router-link to="/register" class="underline underline-offset-4 hover:text-primary">Sign up</router-link>
       </FieldDescription>
     </FieldGroup>
   </form>

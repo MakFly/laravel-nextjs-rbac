@@ -14,6 +14,8 @@ export interface User {
   permissions: Permission[];
   is_impersonating?: boolean;
   impersonator?: { id: number; name: string; email: string } | null;
+  onboarding_status: "pending" | "in_progress" | "completed";
+  onboarding_step: number;
 }
 
 export interface AuthTokens {
@@ -128,4 +130,51 @@ export function hasRole(user: User, roleSlug: RoleSlug): boolean {
 
 export function isAdmin(user: User): boolean {
   return hasRole(user, "admin");
+}
+
+// ============================================================================
+// Onboarding Types
+// ============================================================================
+
+export interface PersonalInfoData {
+  phone: string;
+  date_of_birth: string;
+  street: string;
+  city: string;
+  postal_code: string;
+  country: string;
+  nationality: string;
+}
+
+export interface IdentityVerificationData {
+  id_document_type: "passport" | "national_id" | "drivers_license";
+  id_document_number: string;
+  id_expiry_date: string;
+}
+
+export interface FinancialProfileData {
+  employment_status: string;
+  annual_income_range: string;
+  source_of_funds: string;
+  investment_experience: string;
+}
+
+export interface OperationSetupData {
+  account_type: "banking" | "crypto" | "both";
+  preferred_currency?: string;
+  iban?: string;
+  preferred_cryptocurrency?: string;
+  wallet_address?: string;
+  initial_transaction_amount: "under_1k" | "1k_10k" | "10k_50k" | "50k_100k" | "over_100k";
+}
+
+export interface OnboardingDraft {
+  current_step: number;
+  data: {
+    step1?: PersonalInfoData;
+    step2?: IdentityVerificationData;
+    step3?: FinancialProfileData;
+    step4?: OperationSetupData;
+  };
+  updated_at: string;
 }

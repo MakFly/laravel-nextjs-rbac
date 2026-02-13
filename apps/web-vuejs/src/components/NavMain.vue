@@ -5,6 +5,7 @@ import {
   IconShield,
   IconLock,
   IconFileDescription,
+  IconChartCandle,
 } from "@tabler/icons-vue"
 
 import {
@@ -15,10 +16,13 @@ import {
   SidebarMenuItem,
 } from '@/components/ui/sidebar'
 import { usePermissions } from '@/composables/usePermissions'
+import { useAuthStore } from '@/stores/auth'
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { toast } from 'vue-sonner'
 
 const { hasPermission, isAdmin } = usePermissions()
+const authStore = useAuthStore()
 const router = useRouter()
 
 const navItems = computed(() => {
@@ -53,12 +57,25 @@ const navItems = computed(() => {
       icon: IconFileDescription,
       visible: hasPermission('posts', 'read') || isAdmin.value,
     },
+    {
+      title: 'OrderBook',
+      url: '/dashboard/orderbook',
+      icon: IconChartCandle,
+      visible: true,
+    },
   ]
   return items.filter(item => item.visible)
 })
 
-function navigate(url: string) {
-  router.push(url)
+function navigate(item: { url: string; title: string }) {
+  const isDashboard = item.url === '/dashboard'
+  if (authStore.needsOnboarding && !isDashboard) {
+    toast.info('Complete your onboarding first', {
+      description: 'You need to finish setting up your profile to access this section.',
+    })
+    return
+  }
+  router.push(item.url)
 }
 </script>
 
@@ -67,7 +84,11 @@ function navigate(url: string) {
     <SidebarGroupContent class="flex flex-col gap-2">
       <SidebarMenu>
         <SidebarMenuItem v-for="item in navItems" :key="item.title">
-          <SidebarMenuButton :tooltip="item.title" @click="navigate(item.url)">
+          <SidebarMenuButton
+            :tooltip="item.title"
+            :class="{ 'opacity-50 cursor-not-allowed': authStore.needsOnboarding && item.url !== '/dashboard' }"
+            @click="navigate(item)"
+          >
             <component :is="item.icon" v-if="item.icon" />
             <span>{{ item.title }}</span>
           </SidebarMenuButton>

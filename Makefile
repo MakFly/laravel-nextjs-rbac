@@ -14,7 +14,7 @@
 #
 # ==============================================================================
 
-.PHONY: help install setup dev dev-web dev-vue dev-api build test lint clean \
+.PHONY: help install setup dev dev-web dev-vue dev-api dev-reverb dev-orderbook build test lint clean \
         docker-up docker-down docker-logs \
         db-migrate db-seed db-reset \
         api-install api-test api-tinker
@@ -45,6 +45,8 @@ help:
 	@echo "  make dev-web         → Lance uniquement Next.js (port 3001)"
 	@echo "  make dev-vue         → Lance uniquement Vue.js (port 5173)"
 	@echo "  make dev-api         → Lance uniquement Laravel (port 8000)"
+	@echo "  make dev-reverb      → Lance Reverb WebSocket (port 8080)"
+	@echo "  make dev-orderbook   → Lance le stream Binance OrderBook"
 	@echo ""
 	@echo "$(GREEN)Build & Test$(RESET)"
 	@echo "  make build           → Build production (tous les apps)"
@@ -113,6 +115,16 @@ dev-vue:
 dev-api:
 	@echo "$(CYAN)→ Démarrage de Laravel sur http://localhost:8000$(RESET)"
 	cd apps/api && php artisan serve --port=8000
+
+## dev-reverb : Lance le serveur Reverb WebSocket (port 8080)
+dev-reverb:
+	@echo "$(CYAN)→ Démarrage de Reverb WebSocket sur ws://localhost:8080$(RESET)"
+	cd apps/api && php artisan reverb:start --port=8080
+
+## dev-orderbook : Lance le stream Binance BTC/USDT OrderBook
+dev-orderbook:
+	@echo "$(CYAN)→ Démarrage du stream OrderBook BTC/USDT$(RESET)"
+	cd apps/api && php artisan orderbook:stream btcusdt
 
 # ==============================================================================
 # BUILD

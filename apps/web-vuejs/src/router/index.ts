@@ -24,6 +24,12 @@ const routes: RouteRecordRaw[] = [
     meta: { layout: 'none' },
   },
   {
+    path: '/register',
+    name: 'register',
+    component: () => import('@/views/RegisterPage.vue'),
+    meta: { layout: 'none' },
+  },
+  {
     path: '/auth/callback',
     name: 'auth-callback',
     component: () => import('@/views/AuthCallbackPage.vue'),
@@ -58,6 +64,18 @@ const routes: RouteRecordRaw[] = [
     name: 'posts',
     component: () => import('@/views/PostsPage.vue'),
     meta: { requiresAuth: true, permission: { resource: 'posts', action: 'read' } },
+  },
+  {
+    path: '/onboarding',
+    name: 'onboarding',
+    component: () => import('@/views/OnboardingPage.vue'),
+    meta: { requiresAuth: true, layout: 'none' },
+  },
+  {
+    path: '/dashboard/orderbook',
+    name: 'orderbook',
+    component: () => import('@/views/OrderBookPage.vue'),
+    meta: { requiresAuth: true },
   },
   {
     path: '/404',
@@ -96,6 +114,16 @@ router.beforeEach(async (to) => {
       return { path: '/login', query: redirectTo ? { redirectTo } : undefined }
     }
 
+    // Onboarding guard: allow dashboard, block other routes if onboarding incomplete
+    if (authStore.needsOnboarding && to.path !== '/onboarding' && to.path !== '/dashboard') {
+      return { path: '/dashboard' }
+    }
+
+    // If already onboarded, redirect away from onboarding page
+    if (!authStore.needsOnboarding && to.path === '/onboarding') {
+      return { path: '/dashboard' }
+    }
+
     // Check role requirement
     if (to.meta.role && !authStore.hasRole(to.meta.role as 'admin' | 'moderator' | 'user')) {
       return { path: '/dashboard' }
@@ -110,8 +138,8 @@ router.beforeEach(async (to) => {
     }
   }
 
-  // If already authenticated, redirect away from login
-  if (to.path === '/login') {
+  // If already authenticated, redirect away from login/register
+  if (to.path === '/login' || to.path === '/register') {
     if (!authStore.initialized) {
       await authStore.initialize()
     }

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { ShieldIcon, MailIcon, LockIcon, ArrowRightIcon, Wand2Icon } from "lucide-react"
+import { ShieldIcon, MailIcon, LockIcon, ArrowRightIcon, Wand2Icon, EyeIcon, EyeOffIcon } from "lucide-react"
 import { Spinner } from "@/components/ui/spinner"
 import { toast } from "sonner"
 import { Separator } from "@/components/ui/separator"
@@ -19,6 +19,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -162,13 +163,21 @@ export default function LoginPage() {
                 <LockIcon className="absolute left-3 top-3 h-5 w-5 text-muted-foreground pointer-events-none" />
                 <Input
                   id="password"
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   placeholder="••••••••"
                   value={password}
                   onChange={handlePasswordChange}
-                  className="pl-10 h-11"
+                  className="pl-10 pr-10 h-11"
                   required
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-3 text-muted-foreground hover:text-foreground transition-colors"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+                </button>
               </div>
             </div>
 

@@ -4,7 +4,7 @@ import en from './en'
 
 export type MessageSchema = typeof fr
 
-const STORAGE_KEY = 'tilvest_locale'
+const STORAGE_KEY = 'acme_locale'
 
 // Obtenir la langue stockée ou détecter depuis le navigateur
 function getStoredLocale(): 'en' | 'fr' {

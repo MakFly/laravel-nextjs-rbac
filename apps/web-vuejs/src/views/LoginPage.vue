@@ -15,7 +15,7 @@ import LoginForm from "@/components/LoginForm.vue"
           <div class="bg-primary text-primary-foreground flex size-6 items-center justify-center rounded-md">
             <GalleryVerticalEnd class="size-4" />
           </div>
-          Tilvest
+          Acme
         </a>
       </div>
       <div class="flex flex-1 items-center justify-center">
