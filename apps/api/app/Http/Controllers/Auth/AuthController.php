@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\OnboardingCacheService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -12,6 +13,10 @@ use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
+    public function __construct(
+        private OnboardingCacheService $cacheService
+    ) {}
+
     public function register(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -58,6 +63,9 @@ class AuthController extends Controller
 
         $user = User::where('email', $validated['email'])->firstOrFail();
         $token = $user->createToken('auth_token')->accessToken;
+
+        // Warmup onboarding cache
+        $this->cacheService->warmup($user->id);
 
         return response()->json([
             'data' => [
@@ -116,6 +124,9 @@ class AuthController extends Controller
         }
 
         $request->session()->regenerate();
+
+        // Warmup onboarding cache
+        $this->cacheService->warmup(Auth::id());
 
         return response()->json([
             'data' => [

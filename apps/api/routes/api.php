@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\OAuthController;
+use App\Http\Controllers\CacheDebugController;
 use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
@@ -83,6 +84,13 @@ Route::prefix('v1')
 
             Route::get('/me', [AuthController::class, 'me']);
 
+            // Cache debug routes (for development/debugging)
+            Route::prefix('debug/cache')->group(function () {
+                Route::get('/', [CacheDebugController::class, 'show']);
+                Route::post('/warmup', [CacheDebugController::class, 'warmup']);
+                Route::delete('/', [CacheDebugController::class, 'invalidate']);
+            });
+
             // Onboarding routes (accessible before onboarding is complete)
             Route::prefix('onboarding')->group(function () {
                 Route::get('/status', [OnboardingController::class, 'status']);
@@ -140,6 +148,13 @@ Route::prefix('spa')->group(function () {
 
         Route::post('/auth/logout', [AuthController::class, 'spaLogout']);
         Route::get('/me', [AuthController::class, 'me']);
+
+        // Cache debug routes (for development/debugging)
+        Route::prefix('debug/cache')->group(function () {
+            Route::get('/', [CacheDebugController::class, 'show']);
+            Route::post('/warmup', [CacheDebugController::class, 'warmup']);
+            Route::delete('/', [CacheDebugController::class, 'invalidate']);
+        });
 
         // Onboarding routes (accessible before onboarding is complete)
         Route::prefix('onboarding')->group(function () {

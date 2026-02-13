@@ -78,6 +78,12 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true },
   },
   {
+    path: '/dashboard/cache-debug',
+    name: 'cache-debug',
+    component: () => import('@/views/CacheDebugPage.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/404',
     name: 'not-found',
     component: () => import('@/views/NotFoundPage.vue'),
