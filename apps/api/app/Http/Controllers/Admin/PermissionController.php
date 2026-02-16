@@ -14,6 +14,7 @@ class PermissionController extends Controller
             ->get()
             ->map(function ($perm) {
                 $parts = explode('.', $perm->name);
+
                 return [
                     'id' => $perm->id,
                     'name' => $perm->name,

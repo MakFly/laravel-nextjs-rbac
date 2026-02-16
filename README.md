@@ -2,14 +2,14 @@
 
 A secure, production-ready RBAC (Role-Based Access Control) system with **dual frontend architecture**:
 
-- **Next.js** (App Router) — BFF pattern with Laravel Sanctum
-- **Vue.js 3 SPA** — Direct API calls with session-based Sanctum auth
+- **Next.js** (App Router) — BFF pattern with Passport + HMAC
+- **Vue.js 3 SPA** — Passport tokens in HttpOnly cookies
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                         DUAL AUTH SYSTEM                            │
+│                    DUAL FRONTEND — PASSPORT AUTH                     │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
 │  NEXT.JS BFF (Port 3001)          │    VUE.JS SPA (Port 5173)       │
@@ -28,8 +28,8 @@ A secure, production-ready RBAC (Role-Based Access Control) system with **dual f
 │       │         ┌───────────┐     │          │                      │
 │       │         │           │     │          │ credentials:         │
 │       │         │  Laravel  │◀────┼──────────┤   'include'          │
-│       └─────────│    API    │     │          │ X-XSRF-TOKEN         │
-│        Set-Cook│  (Sanctum) │     │          ▼                      │
+│       └─────────│    API    │     │          │ (HttpOnly cookies)   │
+│        Set-Cook │ (Passport)│     │          ▼                      │
 │       ie        │           │     │    ┌───────────┐                │
 │                 └───────────┘     │    │  Laravel  │                │
 │                                   │    │    API    │                │
@@ -44,10 +44,10 @@ A secure, production-ready RBAC (Role-Based Access Control) system with **dual f
 
 | Feature | Next.js BFF | Vue.js SPA |
 |---------|-------------|------------|
-| **Auth** | Sanctum session (via server) | Sanctum session (direct) |
-| **CSRF** | Server-side forwarding | `X-XSRF-TOKEN` header |
-| **Cookies** | Forwarded manually | `credentials: 'include'` |
-| **Security** | No token in browser JS | HttpOnly cookies |
+| **Auth** | Passport (via server) | Passport (HttpOnly cookies) |
+| **Tokens** | Server-side forwarding | Cookie-based (automatic) |
+| **Security** | No token in browser JS | HttpOnly cookies, no CSRF needed |
+| **State** | Stateless | Stateless |
 
 ## Tech Stack
 
@@ -56,7 +56,7 @@ A secure, production-ready RBAC (Role-Based Access Control) system with **dual f
 | **Monorepo** | Turbo + Bun |
 | **Frontend 1** | Next.js 15 (App Router) + React 19 |
 | **Frontend 2** | Vue.js 3 + Vite + Pinia |
-| **Backend** | Laravel 11 + Sanctum |
+| **Backend** | Laravel 11 + Passport |
 | **RBAC** | spatie/laravel-permission |
 | **UI** | shadcn/ui (both frontends) |
 | **Styling** | Tailwind CSS v4 |
@@ -69,26 +69,25 @@ laravel-nextjs-rbac/
 │   ├── web/                          # Next.js BFF (port 3001)
 │   │   └── src/
 │   │       ├── app/
-│   │       │   ├── api/spa/[...path] # BFF proxy to Laravel
+│   │       │   ├── api/v1/[...path]  # BFF proxy to Laravel
 │   │       │   └── (routes)/         # Frontend pages
 │   │       └── lib/api/
 │   │           ├── auth.ts           # Server Actions
-│   │           └── laravel.ts        # Laravel client + CSRF
+│   │           └── laravel.ts        # Laravel client
 │   │
 │   ├── web-vuejs/                    # Vue.js SPA (port 5173)
 │   │   └── src/
-│   │       ├── lib/api/              # API client with CSRF
+│   │       ├── lib/api/              # API client (HttpOnly cookies)
 │   │       ├── stores/               # Pinia stores
 │   │       ├── views/                # Pages
 │   │       └── components/           # UI components
 │   │
 │   └── api/                          # Laravel API (port 8000)
 │       └── routes/api.php
-│           ├── /api/v1/*             # BFF routes (Passport)
-│           └── /api/spa/*            # SPA routes (Sanctum)
+│           ├── /api/v1/*             # BFF routes (Passport + HMAC)
+│           └── /api/spa/*            # SPA routes (Passport cookies)
 │
 ├── packages/types/                   # Shared TypeScript types
-├── docs/CSRF-EXPLAINED.md            # CSRF documentation
 ├── Makefile                          # Dev commands
 └── turbo.json
 ```
@@ -141,39 +140,40 @@ make dev-vue      # Vue.js (port 5173)
 
 ```
 1. Browser → Server Action (loginAction)
-2. Server calls initCsrfServer() → GET /sanctum/csrf-cookie
-3. Server forwards cookies + X-XSRF-TOKEN to Laravel
-4. Laravel sets session cookie → forwarded to browser
-5. Subsequent requests: cookies forwarded server-side
+2. Server calls Laravel /api/v1/auth/login
+3. Laravel returns access_token (Passport JWT)
+4. Server Action sets HttpOnly cookie auth_token
+5. Subsequent requests: cookie forwarded server-side
 ```
 
 **Key Point**: `credentials: 'include'` does NOT work in Server Actions. Cookies must be forwarded manually.
 
-### Vue.js SPA (Client)
+### Vue.js SPA (Passport Cookies)
 
 ```
-1. Browser → initCsrf() → GET /sanctum/csrf-cookie
-2. Laravel sets XSRF-TOKEN cookie (readable by JS)
-3. Login → POST with X-XSRF-TOKEN header + credentials: 'include'
-4. Laravel sets laravel_session (HttpOnly)
-5. Subsequent requests: browser sends cookies automatically
+1. Login → POST /api/spa/auth/token/login
+2. Laravel creates Passport token + sets HttpOnly cookies:
+   - access_token (JWT, 6h TTL)
+   - refresh_token (UUID, 30d TTL)
+3. Subsequent requests: browser sends cookies automatically
+4. PassportCookieMiddleware injects Bearer token from cookie
 ```
 
 ## API Routes
 
 | Prefix | Auth | Usage |
 |--------|------|-------|
-| `/api/v1/*` | Passport | Next.js BFF |
-| `/api/spa/*` | Sanctum | Vue.js SPA |
-| `/sanctum/csrf-cookie` | Public | CSRF token init |
+| `/api/v1/*` | Passport + HMAC | Next.js BFF |
+| `/api/spa/*` | Passport cookie | Vue.js SPA |
 
 ### Endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/auth/login` | POST | Login |
-| `/auth/register` | POST | Register |
-| `/auth/logout` | POST | Logout |
+| `/auth/token/login` | POST | Login (token + cookies) |
+| `/auth/token/register` | POST | Register (token + cookies) |
+| `/auth/token/logout` | POST | Logout (clear cookies) |
+| `/auth/token/refresh` | POST | Refresh tokens |
 | `/me` | GET | Current user |
 | `/auth/providers` | GET | OAuth providers |
 
@@ -209,6 +209,8 @@ $user->hasRole('admin');
 ```env
 NEXT_PUBLIC_APP_URL=http://localhost:3001
 LARAVEL_API_URL=http://localhost:8000
+BFF_HMAC_SECRET=xxx
+BFF_ID=nextjs-bff-prod
 ```
 
 ### Vue.js (`apps/web-vuejs/.env.local`)
@@ -224,32 +226,15 @@ VITE_LARAVEL_API_URL=http://localhost:8000
 APP_URL=http://localhost:8000
 FRONTEND_URL=http://localhost:3001
 VUE_FRONTEND_URL=http://localhost:5173
-
-SANCTUM_STATEFUL_DOMAINS=localhost:3001,localhost:5173
-SESSION_DOMAIN=localhost
 ```
-
-## CSRF Protection
-
-Both frontends use CSRF tokens with Laravel Sanctum. See [docs/CSRF-EXPLAINED.md](docs/CSRF-EXPLAINED.md) for detailed explanation.
-
-**Summary:**
-- CSRF tokens protect against Cross-Site Request Forgery
-- Required because cookies are sent automatically by browsers
-- Token proves request comes from YOUR frontend, not a malicious site
 
 ## Troubleshooting
 
-### 419 CSRF Token Mismatch
+### 401 Unauthorized on SPA requests
 
-**Next.js**: Call `initCsrfServer()` before POST requests
-**Vue.js**: Call `initCsrf()` before POST requests
-
-### Session Not Persisting
-
-1. Check `SANCTUM_STATEFUL_DOMAINS` includes your frontend URL
-2. Verify `SESSION_DOMAIN` is correct
-3. Ensure cookies are not blocked by browser
+1. Check cookies are sent (`credentials: 'include'` in fetch)
+2. Verify `access_token` cookie is present in browser DevTools
+3. Try refreshing the token via POST `/api/spa/auth/token/refresh`
 
 ### CORS Errors (Vue.js only)
 

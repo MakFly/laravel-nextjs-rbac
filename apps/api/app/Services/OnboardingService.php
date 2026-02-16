@@ -26,9 +26,10 @@ class OnboardingService
 
         if ($cachedData !== null) {
             // Return a draft-like object with cached data
-            $draft = new OnboardingDraft();
+            $draft = new OnboardingDraft;
             $draft->user_id = $userId;
             $draft->data = $cachedData;
+
             return $draft;
         }
 
@@ -90,11 +91,11 @@ class OnboardingService
     /**
      * Finalize onboarding (invalidate cache after completion).
      */
-    public function finalize(int $userId, string $ipAddress = null, string $userAgent = null): void
+    public function finalize(int $userId, ?string $ipAddress = null, ?string $userAgent = null): void
     {
         $draft = OnboardingDraft::where('user_id', $userId)->first();
 
-        if (!$draft) {
+        if (! $draft) {
             throw new \RuntimeException('No onboarding draft found');
         }
 

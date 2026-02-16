@@ -20,26 +20,25 @@ class HmacValidator
     /**
      * Validates an HMAC request
      *
-     * @param Request $request
      * @return array{valid: bool, error?: string}
      */
     public static function validate(Request $request): array
     {
         // 1. Validate presence of required headers
         $headersValidation = self::validateHeaders($request);
-        if (!$headersValidation['valid']) {
+        if (! $headersValidation['valid']) {
             return $headersValidation;
         }
 
         // 2. Validate BFF ID
         $bffValidation = self::validateBffId($request);
-        if (!$bffValidation['valid']) {
+        if (! $bffValidation['valid']) {
             return $bffValidation;
         }
 
         // 3. Validate timestamp
         $timestampValidation = self::validateTimestamp($request);
-        if (!$timestampValidation['valid']) {
+        if (! $timestampValidation['valid']) {
             return $timestampValidation;
         }
 
@@ -59,15 +58,15 @@ class HmacValidator
         $missingHeaders = [];
 
         foreach ($requiredHeaders as $header) {
-            if (!$request->hasHeader($header)) {
+            if (! $request->hasHeader($header)) {
                 $missingHeaders[] = $header;
             }
         }
 
-        if (!empty($missingHeaders)) {
+        if (! empty($missingHeaders)) {
             return [
                 'valid' => false,
-                'error' => 'Missing required headers: ' . implode(', ', $missingHeaders),
+                'error' => 'Missing required headers: '.implode(', ', $missingHeaders),
             ];
         }
 
@@ -196,7 +195,7 @@ class HmacValidator
         $expectedSignature = hash_hmac('sha256', $payload, $secret);
 
         // Secure comparison to prevent timing attacks
-        if (!hash_equals($expectedSignature, $providedSignature)) {
+        if (! hash_equals($expectedSignature, $providedSignature)) {
             Log::warning('BFF signature validation failed', [
                 'payload' => $payload,
                 'expected' => $expectedSignature,

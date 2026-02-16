@@ -4,8 +4,8 @@ namespace App\Http\Middleware;
 
 use App\Helpers\HmacValidator;
 use Closure;
-use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -24,7 +24,7 @@ class BffHmacMiddleware
         // Valider la signature HMAC
         $validation = HmacValidator::validate($request);
 
-        if (!$validation['valid']) {
+        if (! $validation['valid']) {
             Log::warning('BFF authentication failed', [
                 'error' => $validation['error'],
                 'path' => $request->path(),

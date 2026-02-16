@@ -117,15 +117,19 @@ export interface OAuthRedirectResponse {
 export function hasPermission(
   user: User,
   resource: string,
-  action: PermissionAction
+  action: PermissionAction,
 ): boolean {
-  return user.permissions.some(
-    (p) => p.resource === resource && (p.action === action || p.action === "manage")
+  return (
+    user.permissions?.some(
+      (p) =>
+        p.resource === resource &&
+        (p.action === action || p.action === "manage"),
+    ) ?? false
   );
 }
 
 export function hasRole(user: User, roleSlug: RoleSlug): boolean {
-  return user.roles.some((r) => r.slug === roleSlug);
+  return user.roles?.some((r) => r.slug === roleSlug) ?? false;
 }
 
 export function isAdmin(user: User): boolean {
@@ -165,7 +169,12 @@ export interface OperationSetupData {
   iban?: string;
   preferred_cryptocurrency?: string;
   wallet_address?: string;
-  initial_transaction_amount: "under_1k" | "1k_10k" | "10k_50k" | "50k_100k" | "over_100k";
+  initial_transaction_amount:
+    | "under_1k"
+    | "1k_10k"
+    | "10k_50k"
+    | "50k_100k"
+    | "over_100k";
 }
 
 export interface OnboardingDraft {

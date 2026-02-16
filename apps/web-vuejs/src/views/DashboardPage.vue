@@ -12,9 +12,9 @@ const authStore = useAuthStore()
 
 const userName = computed(() => authStore.user?.name || 'User')
 const userRoles = computed(() =>
-  authStore.user?.roles.map(r => r.name).join(', ') || 'No roles',
+  authStore.user?.roles?.map(r => r.name).join(', ') || 'No roles',
 )
-const userPermissionsCount = computed(() => authStore.user?.permissions.length || 0)
+const userPermissionsCount = computed(() => authStore.user?.permissions?.length || 0)
 </script>
 
 <template>
@@ -50,7 +50,7 @@ const userPermissionsCount = computed(() => authStore.user?.permissions.length |
         <div class="px-4 lg:px-6">
           <div class="rounded-xl border bg-card p-6 shadow-sm">
             <h3 class="text-lg font-semibold mb-4">Your Permissions</h3>
-            <div v-if="authStore.user?.permissions.length" class="flex flex-wrap gap-2">
+            <div v-if="authStore.user?.permissions?.length" class="flex flex-wrap gap-2">
               <span
                 v-for="perm in authStore.user.permissions"
                 :key="perm.id"

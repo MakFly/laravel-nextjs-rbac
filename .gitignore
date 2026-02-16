@@ -9,8 +9,6 @@ dist/
 build/
 
 # Environment
-.env
-.env.local
 .env.*.local
 
 # IDE
@@ -37,3 +35,4 @@ coverage/
 
 # Cache
 *.cache
+config.bat

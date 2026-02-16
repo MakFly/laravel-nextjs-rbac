@@ -103,7 +103,7 @@ class BffIntegrationTest extends TestCase
         $token = $user->createToken('test-token')->accessToken;
 
         $headers = $this->withBffHeaders('GET', '/api/v1/me');
-        $headers['Authorization'] = 'Bearer ' . $token;
+        $headers['Authorization'] = 'Bearer '.$token;
 
         $response = $this->withHeaders($headers)->getJson('/api/v1/me');
 
@@ -139,15 +139,15 @@ class BffIntegrationTest extends TestCase
         $token = $user->createToken('test-token')->accessToken;
 
         $headers = $this->withBffHeaders('GET', '/api/v1/admin/roles');
-        $headers['Authorization'] = 'Bearer ' . $token;
+        $headers['Authorization'] = 'Bearer '.$token;
 
         $response = $this->withHeaders($headers)->getJson('/api/v1/admin/roles');
 
         $response->assertStatus(200);
         $response->assertJsonStructure([
             'data' => [
-                '*' => ['id', 'name', 'slug', 'permissions']
-            ]
+                '*' => ['id', 'name', 'slug', 'permissions'],
+            ],
         ]);
     }
 
@@ -162,7 +162,7 @@ class BffIntegrationTest extends TestCase
         $token = $user->createToken('test-token')->accessToken;
 
         $headers = $this->withBffHeaders('GET', '/api/v1/admin/users');
-        $headers['Authorization'] = 'Bearer ' . $token;
+        $headers['Authorization'] = 'Bearer '.$token;
 
         $response = $this->withHeaders($headers)->getJson('/api/v1/admin/users');
 
@@ -170,13 +170,13 @@ class BffIntegrationTest extends TestCase
         $response->assertJsonStructure([
             'data' => [
                 'data' => [
-                    '*' => ['id', 'email', 'name', 'roles']
+                    '*' => ['id', 'email', 'name', 'roles'],
                 ],
                 'current_page',
                 'last_page',
                 'per_page',
-                'total'
-            ]
+                'total',
+            ],
         ]);
     }
 
@@ -204,7 +204,7 @@ class BffIntegrationTest extends TestCase
             'X-BFF-Id' => config('services.bff.id'),
             'X-BFF-Timestamp' => $timestamp,
             'X-BFF-Signature' => $signature,
-            'Authorization' => 'Bearer ' . $token,
+            'Authorization' => 'Bearer '.$token,
         ];
 
         $response = $this->withHeaders($headers)->postJson('/api/v1/auth/logout', json_decode($body, true));
@@ -231,13 +231,13 @@ class BffIntegrationTest extends TestCase
         $token = $user->createToken('test-token')->accessToken;
 
         $headers = $this->withBffHeaders('GET', '/api/v1/posts');
-        $headers['Authorization'] = 'Bearer ' . $token;
+        $headers['Authorization'] = 'Bearer '.$token;
 
         $response = $this->withHeaders($headers)->getJson('/api/v1/posts');
 
         $response->assertStatus(200);
         $response->assertJson([
-            'message' => 'Posts list - you have posts.read permission'
+            'message' => 'Posts list - you have posts.read permission',
         ]);
     }
 

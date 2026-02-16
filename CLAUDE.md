@@ -2,16 +2,16 @@
 
 ## Architecture
 
-Ce projet utilise une architecture **dual auth** :
+Ce projet utilise une architecture **dual frontend, single auth** :
 
 ```
 Navigateur → Next.js (BFF + HMAC) → Laravel API (Passport tokens)
-Navigateur → Vue.js SPA (Sanctum) → Laravel API (session + CSRF)
+Navigateur → Vue.js SPA (Passport cookies) → Laravel API (Passport tokens)
 ```
 
 - **Frontend Next.js** : Next.js App Router (`apps/web/`) — BFF pattern avec Passport + HMAC
-- **Frontend Vue.js** : Vue 3 SPA (`apps/web-vuejs/`) — Sanctum SPA mode (session + CSRF + cookies HttpOnly)
-- **Backend** : Laravel avec Passport + Sanctum (`apps/api/`)
+- **Frontend Vue.js** : Vue 3 SPA (`apps/web-vuejs/`) — Passport tokens dans cookies HttpOnly
+- **Backend** : Laravel avec Passport (`apps/api/`) — 100% stateless, 0 session
 
 ## Structure du projet
 
@@ -23,7 +23,7 @@ apps/
 │       └── lib/api/        # Server Actions pour l'auth
 ├── web-vuejs/              # Vue 3 SPA
 │   └── src/
-│       ├── lib/api/        # API client (CSRF) + auth + admin
+│       ├── lib/api/        # API client + auth + admin
 │       ├── stores/         # Pinia stores (auth)
 │       ├── views/          # Pages (Dashboard, Users, Roles, etc.)
 │       └── components/     # Composants UI (shadcn-vue)
@@ -64,29 +64,40 @@ L'authentification utilise des **cookies HttpOnly** pour sécuriser les tokens.
 3. BFF stocke le token dans un cookie HttpOnly `auth_token`
 4. Les requêtes suivantes lisent le cookie et l'envoient à Laravel
 
-### Vue.js (Sanctum SPA mode)
+### Vue.js — Passport tokens dans cookies HttpOnly
 
-Le SPA Vue utilise **Sanctum session-based auth** (cookies HttpOnly gérés par Laravel) :
+Le SPA Vue utilise des **Passport tokens stockés dans des cookies HttpOnly** :
 
-1. `GET /sanctum/csrf-cookie` → Laravel pose les cookies `XSRF-TOKEN` + `laravel_session`
-2. Login → POST `/api/spa/auth/login` avec `X-XSRF-TOKEN` header → Laravel crée la session
-3. Les requêtes suivantes envoient automatiquement le cookie session (`credentials: 'include'`)
-4. Le Vite dev server proxy les requêtes `/api/spa/*` et `/sanctum/*` vers Laravel
+1. Login → POST `/api/spa/auth/token/login` → Laravel crée un token Passport
+2. Laravel retourne 2 cookies HttpOnly : `access_token` (JWT) + `refresh_token` (UUID)
+3. Les requêtes suivantes envoient les cookies automatiquement (`credentials: 'include'`)
+4. `PassportCookieMiddleware` lit le cookie et injecte le Bearer token
+
+### Impersonation (token-based)
+
+L'impersonation fonctionne via un **cookie `admin_token`** (UUID du token Passport admin) :
+
+1. Admin POST `/admin/impersonate/{user}` → sauvegarde admin token ID dans cookie `admin_token`
+2. Crée de nouveaux tokens Passport pour le user cible → remplace `access_token` + `refresh_token`
+3. `GET /me` → détecte le cookie `admin_token` → lookup Token DB → ajoute `is_impersonating` + `impersonator`
+4. Stop → lookup `admin_token` → restaure tokens admin → clear `admin_token`
 
 ### Fichiers clés
 
 - `apps/web/src/app/api/v1/[...path]/route.ts` - BFF Proxy Next.js
 - `apps/web/src/lib/api/auth.ts` - Server Actions auth
-- `apps/web-vuejs/src/lib/api/client.ts` - API client avec CSRF (Sanctum)
-- `apps/web-vuejs/src/lib/api/auth.ts` - API auth Vue.js (session-based)
+- `apps/web-vuejs/src/lib/api/client.ts` - API client (cookies HttpOnly)
+- `apps/web-vuejs/src/lib/api/auth.ts` - API auth Vue.js (token-based)
 - `apps/web-vuejs/src/stores/auth.ts` - Pinia auth store
+- `apps/api/app/Http/Controllers/Concerns/HasTokenCookies.php` - Trait cookie partagé
+- `apps/api/app/Http/Middleware/PassportCookieMiddleware.php` - Cookie → Bearer injection
 
 ## API Routes
 
 | Prefix | Auth | Usage |
 |--------|------|-------|
 | `/api/v1/*` | Passport + HMAC | Next.js BFF |
-| `/api/spa/*` | Sanctum session (web guard) | Vue.js SPA |
+| `/api/spa/*` | Passport cookie (HttpOnly) | Vue.js SPA |
 
 ## Règles importantes
 
@@ -108,8 +119,6 @@ VITE_LARAVEL_API_URL=http://localhost:8000
 
 # API (.env)
 APP_URL=http://localhost:8000
-SANCTUM_STATEFUL_DOMAINS=localhost:5173,localhost:3000
-SESSION_DOMAIN=localhost
 FRONTEND_URL=http://localhost:3001
 VUE_FRONTEND_URL=http://localhost:5173
 ```

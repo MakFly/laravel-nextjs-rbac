@@ -1,5 +1,5 @@
 import type { OnboardingDraft } from '@rbac/types'
-import { apiRequest, initCsrf } from './client'
+import { apiRequest } from './client'
 
 interface OnboardingStatusResponse {
   data: {
@@ -35,7 +35,6 @@ export async function getOnboardingDraft() {
 }
 
 export async function saveOnboardingStep(step: number, data: Record<string, unknown>) {
-  await initCsrf()
   const response = await apiRequest<OnboardingStepResponse>(`/onboarding/step/${step}`, {
     method: 'POST',
     body: JSON.stringify(data),
@@ -44,7 +43,6 @@ export async function saveOnboardingStep(step: number, data: Record<string, unkn
 }
 
 export async function completeOnboarding() {
-  await initCsrf()
   const response = await apiRequest<OnboardingCompleteResponse>('/onboarding/complete', {
     method: 'POST',
   })

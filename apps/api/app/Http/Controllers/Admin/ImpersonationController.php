@@ -3,40 +3,49 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\Concerns\HasTokenCookies;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
+use Laravel\Passport\Token;
 
 class ImpersonationController extends Controller
 {
+    use HasTokenCookies;
+
     /**
-     * Start impersonating a user
+     * Start impersonating a user.
+     *
+     * Saves the admin's current Passport token ID in an admin_token cookie,
+     * then issues fresh Passport tokens for the target user.
      */
     public function impersonate(Request $request, User $user): JsonResponse
     {
         $admin = $request->user();
 
-        // Cannot impersonate yourself
         if ($admin->id === $user->id) {
             return response()->json([
                 'message' => 'You cannot impersonate yourself.',
             ], 403);
         }
 
-        // Cannot impersonate another admin
         if ($user->hasRole('admin')) {
             return response()->json([
                 'message' => 'You cannot impersonate an admin user.',
             ], 403);
         }
 
-        // Store the original admin ID in session
-        $request->session()->put('impersonator_id', $admin->id);
+        // Save the admin's current token ID so we can restore later
+        $adminTokenId = $admin->token()->id;
 
-        // Log in as the target user
-        Auth::guard('web')->login($user);
+        // Create fresh Passport token for the target user
+        $tokenResult = $user->createToken('impersonation', ['*']);
+        $accessToken = $tokenResult->accessToken;
+        $refreshToken = $tokenResult->token;
+
+        $refreshToken->expires_at = now()->addDays(30);
+        $refreshToken->save();
 
         $userData = AuthController::formatUser($user);
         $userData['is_impersonating'] = true;
@@ -46,38 +55,86 @@ class ImpersonationController extends Controller
             'email' => $admin->email,
         ];
 
-        return response()->json([
+        $response = response()->json([
             'data' => $userData,
             'message' => "Now impersonating {$user->name}",
         ]);
+
+        // Set target user tokens + admin_token cookie
+        $response = $this->withTokenCookies($response, $accessToken, $refreshToken->id);
+        $adminCookie = $this->createTokenCookie(self::ADMIN_TOKEN_COOKIE, $adminTokenId, self::REFRESH_TOKEN_TTL);
+
+        return $response->withCookie($adminCookie);
     }
 
     /**
-     * Stop impersonating and return to admin account
+     * Stop impersonating and return to admin account.
+     *
+     * Reads the admin_token cookie to find the original admin,
+     * revokes the impersonation token, and issues fresh admin tokens.
      */
     public function stopImpersonating(Request $request): JsonResponse
     {
-        $impersonatorId = $request->session()->get('impersonator_id');
+        $adminTokenId = $request->cookie(self::ADMIN_TOKEN_COOKIE);
 
-        if (!$impersonatorId) {
+        if (! $adminTokenId) {
             return response()->json([
                 'message' => 'You are not impersonating anyone.',
             ], 400);
         }
 
-        $admin = User::findOrFail($impersonatorId);
+        // Look up the admin from the saved token
+        $adminToken = Token::find($adminTokenId);
 
-        // Remove impersonation from session
-        $request->session()->forget('impersonator_id');
+        if (! $adminToken) {
+            return $this->clearAllCookies(response()->json([
+                'message' => 'Admin token not found. Session expired.',
+            ], 401));
+        }
 
-        // Log back in as admin
-        Auth::guard('web')->login($admin);
+        $admin = User::find($adminToken->user_id);
+
+        if (! $admin) {
+            return $this->clearAllCookies(response()->json([
+                'message' => 'Admin user not found.',
+            ], 401));
+        }
+
+        // Revoke the impersonation token (current user's token)
+        $currentUser = $request->user();
+        if ($currentUser && $currentUser->token()) {
+            $currentUser->token()->revoke();
+        }
+
+        // Revoke the old admin token
+        $adminToken->revoke();
+
+        // Create fresh tokens for the admin
+        $tokenResult = $admin->createToken('spa-auth', ['*']);
+        $accessToken = $tokenResult->accessToken;
+        $refreshToken = $tokenResult->token;
+
+        $refreshToken->expires_at = now()->addDays(30);
+        $refreshToken->save();
 
         $userData = AuthController::formatUser($admin);
 
-        return response()->json([
+        $response = response()->json([
             'data' => $userData,
             'message' => 'Stopped impersonating. Welcome back!',
         ]);
+
+        // Set admin tokens + clear admin_token cookie
+        $response = $this->withTokenCookies($response, $accessToken, $refreshToken->id);
+        $expiredAdminCookie = $this->createExpiredCookie(self::ADMIN_TOKEN_COOKIE);
+
+        return $response->withCookie($expiredAdminCookie);
+    }
+
+    private function clearAllCookies(JsonResponse $response): JsonResponse
+    {
+        $response = $this->clearTokenCookies($response);
+
+        return $response->withCookie($this->createExpiredCookie(self::ADMIN_TOKEN_COOKIE));
     }
 }

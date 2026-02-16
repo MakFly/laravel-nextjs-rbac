@@ -1,19 +1,31 @@
-import { create } from 'zustand';
-import type { User, PermissionAction, RoleSlug } from '@rbac/types';
-import { hasPermission as checkHasPermission, hasRole as checkHasRole, isAdmin as checkIsAdmin } from '@rbac/types';
+import { create } from "zustand";
+import type { User, PermissionAction, RoleSlug } from "@rbac/types";
+import {
+  hasPermission as checkHasPermission,
+  hasRole as checkHasRole,
+  isAdmin as checkIsAdmin,
+} from "@rbac/types";
 import {
   loginAction,
   registerAction,
   logoutAction,
   getCurrentUserAction,
-} from '@/lib/api/auth';
+  tokenLoginAction,
+  tokenLogoutAction,
+  getCurrentUserTokenAction,
+} from "@/lib/api/auth";
 import {
   impersonateUserAction,
   stopImpersonatingAction,
-} from '@/lib/api/admin';
-import type { LoginCredentials, RegisterData, OAuthProvider } from '@rbac/types';
+} from "@/lib/api/admin";
+import type {
+  LoginCredentials,
+  RegisterData,
+  OAuthProvider,
+} from "@rbac/types";
 
-const LARAVEL_API_URL = process.env.NEXT_PUBLIC_LARAVEL_API_URL || 'http://localhost:8000';
+const LARAVEL_API_URL =
+  process.env.NEXT_PUBLIC_LARAVEL_API_URL || "http://localhost:8000";
 
 interface AuthState {
   user: User | null;
@@ -28,9 +40,12 @@ interface AuthState {
   // Actions
   setUser: (user: User | null) => void;
   hydrate: (user: User | null) => void;
+  hydrateWithToken: () => Promise<void>;
   login: (credentials: LoginCredentials) => Promise<void>;
+  tokenLogin: (credentials: LoginCredentials) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => Promise<void>;
+  tokenLogout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   loginWithOAuth: (provider: OAuthProvider) => void;
   clearError: () => void;
@@ -64,7 +79,26 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   setUser: (user) => set({ user, ...extractImpersonationState(user) }),
 
-  hydrate: (user) => set({ user, isHydrated: true, ...extractImpersonationState(user) }),
+  hydrate: (user) =>
+    set({ user, isHydrated: true, ...extractImpersonationState(user) }),
+
+  hydrateWithToken: async () => {
+    set({ error: null });
+    try {
+      const user = await getCurrentUserTokenAction();
+      set({ user, isHydrated: true, ...extractImpersonationState(user) });
+    } catch (err) {
+      set({
+        user: null,
+        isHydrated: true,
+        isImpersonating: false,
+        impersonator: null,
+      });
+      const message =
+        err instanceof Error ? err.message : "Failed to hydrate user";
+      set({ error: message });
+    }
+  },
 
   login: async (credentials) => {
     set({ error: null, isLoading: true });
@@ -73,7 +107,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const user = response.data.user;
       set({ user, isLoading: false, ...extractImpersonationState(user) });
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Login failed';
+      const message = err instanceof Error ? err.message : "Login failed";
       set({ error: message, isLoading: false });
       throw err;
     }
@@ -86,7 +120,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const user = response.data.user;
       set({ user, isLoading: false, ...extractImpersonationState(user) });
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Registration failed';
+      const message =
+        err instanceof Error ? err.message : "Registration failed";
       set({ error: message, isLoading: false });
       throw err;
     }
@@ -96,10 +131,57 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ error: null, isLoading: true });
     try {
       await logoutAction();
-      set({ user: null, isLoading: false, isImpersonating: false, impersonator: null });
+      set({
+        user: null,
+        isLoading: false,
+        isImpersonating: false,
+        impersonator: null,
+      });
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Logout failed';
-      set({ error: message, user: null, isLoading: false, isImpersonating: false, impersonator: null });
+      const message = err instanceof Error ? err.message : "Logout failed";
+      set({
+        error: message,
+        user: null,
+        isLoading: false,
+        isImpersonating: false,
+        impersonator: null,
+      });
+    }
+  },
+
+  // Token-based auth (Passport with cookies)
+  tokenLogin: async (credentials: LoginCredentials) => {
+    set({ error: null, isLoading: true });
+    try {
+      const response = await tokenLoginAction(credentials);
+      const user = response.data.user;
+      set({ user, isLoading: false, ...extractImpersonationState(user) });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Login failed";
+      set({ error: message, isLoading: false });
+      throw err;
+    }
+  },
+
+  tokenLogout: async () => {
+    set({ error: null, isLoading: true });
+    try {
+      await tokenLogoutAction();
+      set({
+        user: null,
+        isLoading: false,
+        isImpersonating: false,
+        impersonator: null,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Logout failed";
+      set({
+        error: message,
+        user: null,
+        isLoading: false,
+        isImpersonating: false,
+        impersonator: null,
+      });
     }
   },
 
@@ -110,7 +192,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ user, ...extractImpersonationState(user) });
     } catch (err) {
       set({ user: null, isImpersonating: false, impersonator: null });
-      const message = err instanceof Error ? err.message : 'Failed to refresh user';
+      const message =
+        err instanceof Error ? err.message : "Failed to refresh user";
       set({ error: message });
       throw err;
     }
@@ -130,7 +213,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const user = response.data;
       set({ user, isLoading: false, ...extractImpersonationState(user) });
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Impersonation failed';
+      const message =
+        err instanceof Error ? err.message : "Impersonation failed";
       set({ error: message, isLoading: false });
       throw err;
     }
@@ -143,7 +227,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const user = response.data;
       set({ user, isLoading: false, ...extractImpersonationState(user) });
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to stop impersonation';
+      const message =
+        err instanceof Error ? err.message : "Failed to stop impersonation";
       set({ error: message, isLoading: false });
       throw err;
     }
@@ -152,7 +237,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   // Computed helpers
   isAuthenticated: () => !!get().user,
 
-  needsOnboarding: () => get().user?.onboarding_status !== 'completed',
+  needsOnboarding: () => get().user?.onboarding_status !== "completed",
 
   hasPermission: (resource, action) => {
     const { user } = get();

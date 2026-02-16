@@ -1,4 +1,4 @@
-import { apiRequest, initCsrf } from './client'
+import { apiRequest } from './client'
 
 export interface CacheKeyInfo {
   key: string
@@ -51,7 +51,6 @@ export async function getCacheDebug(): Promise<CacheDebugResponse> {
  * Force cache warmup for the current user
  */
 export async function warmupCache(): Promise<CacheMessageResponse> {
-  await initCsrf()
   return apiRequest<CacheMessageResponse>('/debug/cache/warmup', {
     method: 'POST',
   })
@@ -61,7 +60,6 @@ export async function warmupCache(): Promise<CacheMessageResponse> {
  * Invalidate cache for the current user
  */
 export async function invalidateCache(): Promise<CacheMessageResponse> {
-  await initCsrf()
   return apiRequest<CacheMessageResponse>('/debug/cache', {
     method: 'DELETE',
   })

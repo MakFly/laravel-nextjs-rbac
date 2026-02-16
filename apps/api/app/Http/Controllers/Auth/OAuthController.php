@@ -2,22 +2,24 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Http\Controllers\Concerns\HasTokenCookies;
 use App\Http\Controllers\Controller;
 use App\Models\OAuthProvider;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Laravel\Socialite\Facades\Socialite;
 
 class OAuthController extends Controller
 {
+    use HasTokenCookies;
+
     protected array $providers = ['google', 'github'];
 
     public function redirect(string $provider, Request $request): RedirectResponse|JsonResponse
     {
-        if (!in_array($provider, $this->providers)) {
+        if (! in_array($provider, $this->providers)) {
             return response()->json(['error' => 'Provider not supported'], 400);
         }
 
@@ -32,27 +34,37 @@ class OAuthController extends Controller
 
     public function callback(string $provider, Request $request): RedirectResponse
     {
-        if (!in_array($provider, $this->providers)) {
-            return redirect(config('app.frontend_url') . '/auth/error?message=Provider not supported');
+        if (! in_array($provider, $this->providers)) {
+            return redirect(config('app.frontend_url').'/auth/error?message=Provider not supported');
         }
 
         try {
             $socialUser = Socialite::driver($provider)->stateless()->user();
         } catch (\Exception $e) {
             $errorUrl = $this->isSpaClient($request)
-                ? config('app.vue_frontend_url') . '/auth/error?message=Authentication failed'
-                : config('app.frontend_url') . '/auth/error?message=Authentication failed';
+                ? config('app.vue_frontend_url').'/auth/error?message=Authentication failed'
+                : config('app.frontend_url').'/auth/error?message=Authentication failed';
+
             return redirect($errorUrl);
         }
 
         $user = $this->findOrCreateUser($provider, $socialUser);
 
-        // SPA flow: session-based login
+        // SPA flow: Passport token-based login with cookies on redirect
         if ($this->isSpaClient($request)) {
-            Auth::login($user);
-            $request->session()->regenerate();
+            $tokenResult = $user->createToken('oauth-spa', ['*']);
+            $accessToken = $tokenResult->accessToken;
+            $refreshToken = $tokenResult->token;
 
-            return redirect(config('app.vue_frontend_url') . '/auth/callback?success=true');
+            $refreshToken->expires_at = now()->addDays(30);
+            $refreshToken->save();
+
+            $redirect = redirect(config('app.vue_frontend_url').'/auth/callback?success=true');
+
+            $redirect->withCookie($this->createTokenCookie(self::ACCESS_TOKEN_COOKIE, $accessToken, self::ACCESS_TOKEN_TTL));
+            $redirect->withCookie($this->createTokenCookie(self::REFRESH_TOKEN_COOKIE, $refreshToken->id, self::REFRESH_TOKEN_TTL));
+
+            return $redirect;
         }
 
         // BFF flow: token-based login (Passport)
@@ -88,7 +100,7 @@ class OAuthController extends Controller
         // Find user by email or create new
         $user = User::where('email', $socialUser->getEmail())->first();
 
-        if (!$user) {
+        if (! $user) {
             $user = User::create([
                 'name' => $socialUser->getName() ?? $socialUser->getNickname() ?? 'User',
                 'email' => $socialUser->getEmail(),

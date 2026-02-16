@@ -11,11 +11,12 @@ class UserController extends Controller
     {
         $users = User::with('roles')->get()->map(function ($user) {
             $userData = $user->toArray();
-            $userData['roles'] = $user->roles->map(fn($role) => [
+            $userData['roles'] = $user->roles->map(fn ($role) => [
                 'id' => $role->id,
                 'name' => $role->name,
                 'slug' => $role->name,
             ]);
+
             return $userData;
         });
 

@@ -1,14 +1,14 @@
 <?php
 
+use App\Http\Controllers\Admin\ImpersonationController;
+use App\Http\Controllers\Admin\PermissionController;
+use App\Http\Controllers\Admin\RoleController;
+use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\OAuthController;
 use App\Http\Controllers\CacheDebugController;
 use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\UserController;
-use App\Http\Controllers\Admin\UserController as AdminUserController;
-use App\Http\Controllers\Admin\RoleController;
-use App\Http\Controllers\Admin\PermissionController;
-use App\Http\Controllers\Admin\ImpersonationController;
 use Illuminate\Support\Facades\Route;
 
 // =========================================================================
@@ -16,7 +16,8 @@ use Illuminate\Support\Facades\Route;
 // These routes MUST remain directly accessible from outside
 // =========================================================================
 
-// 'web' middleware ensures session is available for SPA OAuth callback (Auth::login)
+// 'web' middleware ensures EncryptCookies + AddQueuedCookiesToResponse
+// for setting token cookies on the OAuth redirect response
 Route::middleware('web')->prefix('auth')->group(function () {
     Route::get('/{provider}/redirect', [OAuthController::class, 'redirect']);
     Route::get('/{provider}/callback', [OAuthController::class, 'callback']);
@@ -71,6 +72,7 @@ Route::prefix('v1')
         Route::prefix('auth')->group(function () {
             Route::post('/register', [AuthController::class, 'register']);
             Route::post('/login', [AuthController::class, 'login']);
+            Route::post('/token/login', [AuthController::class, 'tokenLogin']);
             Route::get('/providers', [OAuthController::class, 'providers']);
         });
 
@@ -79,7 +81,9 @@ Route::prefix('v1')
 
             Route::prefix('auth')->group(function () {
                 Route::post('/logout', [AuthController::class, 'logout']);
+                Route::post('/token/logout', [AuthController::class, 'tokenLogout']);
                 Route::post('/refresh', [AuthController::class, 'refresh']);
+                Route::post('/token/refresh', [AuthController::class, 'tokenRefresh']);
             });
 
             Route::get('/me', [AuthController::class, 'me']);
@@ -130,23 +134,35 @@ Route::prefix('v1')
     });
 
 // =========================================================================
-// SPA Routes (Sanctum session-based) - Access via Vue.js SPA
-// All /api/spa/* routes use session auth via web guard
+// SPA Routes (Vue.js) - Passport token auth with HttpOnly cookies
 // =========================================================================
 
 Route::prefix('spa')->group(function () {
 
-    // Public auth routes
+    // -----------------------------------------------------------------
+    // Public routes (no auth required)
+    // -----------------------------------------------------------------
+
     Route::prefix('auth')->group(function () {
-        Route::post('/login', [AuthController::class, 'spaLogin']);
-        Route::post('/register', [AuthController::class, 'spaRegister']);
         Route::get('/providers', [OAuthController::class, 'providers']);
+
+        // Passport token auth (rate limited)
+        Route::middleware('throttle:10,1')->prefix('token')->group(function () {
+            Route::post('/login', [AuthController::class, 'tokenLogin']);
+            Route::post('/register', [AuthController::class, 'tokenRegister']);
+        });
+
+        // Token refresh — outside auth middleware (uses refresh_token cookie)
+        Route::middleware('throttle:5,1')->post('/token/refresh', [AuthController::class, 'tokenRefresh']);
     });
 
-    // Protected routes (session auth via web guard)
-    Route::middleware('auth:web')->group(function () {
+    // -----------------------------------------------------------------
+    // Protected routes (Passport cookie auth only — fully stateless)
+    // -----------------------------------------------------------------
 
-        Route::post('/auth/logout', [AuthController::class, 'spaLogout']);
+    Route::middleware(['passport.cookie', 'auth:api'])->group(function () {
+
+        Route::post('/auth/token/logout', [AuthController::class, 'tokenLogout']);
         Route::get('/me', [AuthController::class, 'me']);
 
         // Cache debug routes (for development/debugging)

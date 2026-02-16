@@ -14,8 +14,8 @@ class DistributedLockService
     /**
      * Attempt to acquire a distributed lock.
      *
-     * @param string $key Lock key
-     * @param int $ttl Time-to-live in seconds
+     * @param  string  $key  Lock key
+     * @param  int  $ttl  Time-to-live in seconds
      * @return string|null Lock token if acquired, null if failed
      */
     public function acquire(string $key, int $ttl = 30): ?string
@@ -38,8 +38,8 @@ class DistributedLockService
     /**
      * Release a distributed lock (only if we own it).
      *
-     * @param string $key Lock key
-     * @param string $token Lock token from acquire()
+     * @param  string  $key  Lock key
+     * @param  string  $token  Lock token from acquire()
      */
     public function release(string $key, string $token): void
     {
@@ -60,11 +60,12 @@ class DistributedLockService
     /**
      * Execute a callback while holding a distributed lock.
      *
-     * @param string $key Lock key
-     * @param callable $callback Code to execute while holding lock
-     * @param int $ttl Lock timeout in seconds
-     * @param int $maxWait Maximum time to wait for lock in seconds
+     * @param  string  $key  Lock key
+     * @param  callable  $callback  Code to execute while holding lock
+     * @param  int  $ttl  Lock timeout in seconds
+     * @param  int  $maxWait  Maximum time to wait for lock in seconds
      * @return mixed Callback result
+     *
      * @throws \RuntimeException If lock cannot be acquired
      */
     public function withLock(string $key, callable $callback, int $ttl = 30, int $maxWait = 5): mixed

@@ -27,6 +27,7 @@ class OnboardingCacheService
 
         return Cache::remember($key, $ttl, function () use ($userId) {
             $draft = OnboardingDraft::where('user_id', $userId)->first();
+
             return $draft?->data;
         });
     }
@@ -65,7 +66,7 @@ class OnboardingCacheService
         return Cache::remember($key, $ttl, function () use ($userId) {
             $user = User::find($userId);
 
-            if (!$user) {
+            if (! $user) {
                 return [
                     'status' => 'not_found',
                     'step' => 0,
@@ -96,7 +97,7 @@ class OnboardingCacheService
         return Cache::remember($key, $ttl, function () use ($userId) {
             $operation = UserOperation::where('user_id', $userId)->first();
 
-            if (!$operation) {
+            if (! $operation) {
                 return null;
             }
 

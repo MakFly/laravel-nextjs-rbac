@@ -3,7 +3,6 @@
 namespace Tests\Unit;
 
 use App\Http\Middleware\BffHmacMiddleware;
-use App\Helpers\HmacValidator;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Mockery;
@@ -45,7 +44,7 @@ class BffHmacMiddlewareTest extends TestCase
         $request = Request::create('/api/v1/me', 'GET');
         // Pas de headers HMAC
 
-        $middleware = new BffHmacMiddleware();
+        $middleware = new BffHmacMiddleware;
         $response = $middleware->handle($request, fn ($req) => new Response('OK'));
 
         $this->assertEquals(403, $response->status());
@@ -64,7 +63,7 @@ class BffHmacMiddlewareTest extends TestCase
         $request->headers->set('X-BFF-Timestamp', $timestamp);
         $request->headers->set('X-BFF-Signature', $signature);
 
-        $middleware = new BffHmacMiddleware();
+        $middleware = new BffHmacMiddleware;
         $response = $middleware->handle($request, fn ($req) => new Response('Success'));
 
         $this->assertEquals(200, $response->status());
@@ -81,7 +80,7 @@ class BffHmacMiddlewareTest extends TestCase
         $request->headers->set('X-BFF-Timestamp', $timestamp);
         $request->headers->set('X-BFF-Signature', $signature);
 
-        $middleware = new BffHmacMiddleware();
+        $middleware = new BffHmacMiddleware;
         $response = $middleware->handle($request, fn ($req) => new Response('OK'));
 
         $this->assertEquals(403, $response->status());
@@ -97,7 +96,7 @@ class BffHmacMiddlewareTest extends TestCase
         $request->headers->set('X-BFF-Timestamp', $timestamp);
         $request->headers->set('X-BFF-Signature', $signature);
 
-        $middleware = new BffHmacMiddleware();
+        $middleware = new BffHmacMiddleware;
         $response = $middleware->handle($request, fn ($req) => new Response('OK'));
 
         $this->assertEquals(403, $response->status());
@@ -112,7 +111,7 @@ class BffHmacMiddlewareTest extends TestCase
         $request->headers->set('X-BFF-Timestamp', $timestamp);
         $request->headers->set('X-BFF-Signature', 'wrong-signature');
 
-        $middleware = new BffHmacMiddleware();
+        $middleware = new BffHmacMiddleware;
         $response = $middleware->handle($request, fn ($req) => new Response('OK'));
 
         $this->assertEquals(403, $response->status());
@@ -139,7 +138,7 @@ class BffHmacMiddlewareTest extends TestCase
         $request->headers->set('X-BFF-Timestamp', $timestamp);
         $request->headers->set('X-BFF-Signature', $signature);
 
-        $middleware = new BffHmacMiddleware();
+        $middleware = new BffHmacMiddleware;
         $response = $middleware->handle($request, fn ($req) => new Response('Success'));
 
         $this->assertEquals(200, $response->status());

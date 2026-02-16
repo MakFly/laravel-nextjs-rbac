@@ -26,6 +26,7 @@ class RoleController extends Controller
                     'updated_at' => $role->updated_at,
                     'permissions' => $role->permissions->map(function ($perm) {
                         $parts = explode('.', $perm->name);
+
                         return [
                             'id' => $perm->id,
                             'name' => $perm->name,
@@ -89,6 +90,7 @@ class RoleController extends Controller
                 'updated_at' => $role->updated_at,
                 'permissions' => $role->permissions->map(function ($perm) {
                     $parts = explode('.', $perm->name);
+
                     return [
                         'id' => $perm->id,
                         'name' => $perm->name,
